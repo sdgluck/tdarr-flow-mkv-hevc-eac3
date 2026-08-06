@@ -200,18 +200,66 @@
       }
     },
     {
-      "name": "Ensure AC3 384k",
+      "name": "Has EAC3?",
+      "sourceRepo": "Community",
+      "pluginName": "checkAudioCodec",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "audChkEac",
+      "position": {
+        "x": 624,
+        "y": 384
+      },
+      "inputsDB": {
+        "codec": "eac3",
+        "checkBitrate": "false"
+      }
+    },
+    {
+      "name": "Has AC3?",
+      "sourceRepo": "Community",
+      "pluginName": "checkAudioCodec",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "audChkAc3",
+      "position": {
+        "x": 624,
+        "y": 456
+      },
+      "inputsDB": {
+        "codec": "ac3",
+        "checkBitrate": "false"
+      }
+    },
+    {
+      "name": "Has AAC?",
+      "sourceRepo": "Community",
+      "pluginName": "checkAudioCodec",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "audChkAac",
+      "position": {
+        "x": 624,
+        "y": 528
+      },
+      "inputsDB": {
+        "codec": "aac",
+        "checkBitrate": "false"
+      }
+    },
+    {
+      "name": "Ensure EAC3 384k",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandEnsureAudioStream",
       "version": "1.0.0",
       "fpEnabled": true,
       "id": "audEnsure1",
       "position": {
-        "x": 624,
-        "y": 384
+        "x": 444,
+        "y": 600
       },
       "inputsDB": {
-        "audioEncoder": "ac3",
+        "audioEncoder": "eac3",
         "language": "eng",
         "channels": "6",
         "enableBitrate": "true",
@@ -221,40 +269,7 @@
       }
     },
     {
-      "name": "Audio <= 384kbps?",
-      "sourceRepo": "Community",
-      "pluginName": "checkAudioBitrate",
-      "version": "1.0.0",
-      "fpEnabled": true,
-      "id": "audBrChk",
-      "position": {
-        "x": 624,
-        "y": 456
-      },
-      "inputsDB": {
-        "unit": "kbps",
-        "greaterThan": "0",
-        "lessThan": "384"
-      }
-    },
-    {
-      "name": "Force AC3 384k",
-      "sourceRepo": "Community",
-      "pluginName": "ffmpegCommandCustomArguments",
-      "version": "1.0.0",
-      "fpEnabled": true,
-      "id": "audCustom",
-      "position": {
-        "x": 420,
-        "y": 528
-      },
-      "inputsDB": {
-        "inputArguments": "",
-        "outputArguments": "-c:a ac3 -b:a 384k"
-      }
-    },
-    {
-      "name": "Drop Non-AC3 Audio",
+      "name": "Drop Incompatible Audio",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandRemoveStreamByProperty",
       "version": "1.0.0",
@@ -262,12 +277,12 @@
       "id": "audStrip01",
       "position": {
         "x": 624,
-        "y": 600
+        "y": 672
       },
       "inputsDB": {
         "codecType": "audio",
         "propertyToCheck": "codec_name",
-        "valuesToRemove": "ac3",
+        "valuesToRemove": "eac3,ac3,aac",
         "condition": "not_equals"
       }
     },
@@ -280,7 +295,7 @@
       "id": "audExec001",
       "position": {
         "x": 624,
-        "y": 744
+        "y": 816
       }
     },
     {
@@ -292,7 +307,7 @@
       "id": "audReorder",
       "position": {
         "x": 624,
-        "y": 672
+        "y": 744
       },
       "inputsDB": {
         "processOrder": "codecs,channels,languages,streamTypes",
@@ -311,7 +326,7 @@
       "id": "audProped",
       "position": {
         "x": 624,
-        "y": 816
+        "y": 888
       }
     },
     {
@@ -323,7 +338,7 @@
       "id": "XLXwY90TH",
       "position": {
         "x": 624,
-        "y": 888
+        "y": 960
       }
     },
     {
@@ -728,60 +743,6 @@
       "type": "smoothstep"
     },
     {
-      "source": "audEnsure1",
-      "sourceHandle": "1",
-      "target": "audBrChk",
-      "targetHandle": null,
-      "id": "aud-e4",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audBrChk",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "aud-e15",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audBrChk",
-      "sourceHandle": "2",
-      "target": "audCustom",
-      "targetHandle": null,
-      "id": "aud-e16",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audBrChk",
-      "sourceHandle": "err1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "aud-e17",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audCustom",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "aud-e18",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audStart01",
-      "sourceHandle": "1",
-      "target": "audEnsure1",
-      "targetHandle": null,
-      "id": "aud-e3",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
       "source": "9m5iVBMU3",
       "sourceHandle": "2",
       "target": "audCpuEnc",
@@ -805,6 +766,78 @@
       "target": "JBA2N2W7L",
       "targetHandle": null,
       "id": "cpu-e3",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audStart01",
+      "sourceHandle": "1",
+      "target": "audChkEac",
+      "targetHandle": null,
+      "id": "aud-e3",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audChkEac",
+      "sourceHandle": "1",
+      "target": "audStrip01",
+      "targetHandle": null,
+      "id": "aud-e20",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audChkEac",
+      "sourceHandle": "2",
+      "target": "audChkAc3",
+      "targetHandle": null,
+      "id": "aud-e21",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audChkAc3",
+      "sourceHandle": "1",
+      "target": "audStrip01",
+      "targetHandle": null,
+      "id": "aud-e22",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audChkAc3",
+      "sourceHandle": "2",
+      "target": "audChkAac",
+      "targetHandle": null,
+      "id": "aud-e23",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audChkAac",
+      "sourceHandle": "1",
+      "target": "audStrip01",
+      "targetHandle": null,
+      "id": "aud-e24",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audChkAac",
+      "sourceHandle": "2",
+      "target": "audEnsure1",
+      "targetHandle": null,
+      "id": "aud-e25",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audEnsure1",
+      "sourceHandle": "1",
+      "target": "audStrip01",
+      "targetHandle": null,
+      "id": "aud-e4",
       "animated": true,
       "type": "smoothstep"
     }

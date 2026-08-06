@@ -71,22 +71,29 @@ smaller, `Set Original File` discards it and the original is kept.
 (local `CleanAudio` / `CleanSubs`) strip non-English tracks and commentary. SDH
 subtitles are kept.
 
-**5. Audio normalisation.** An ffmpeg-command block that plans one command and
-executes it once. `Begin Command` snapshots the streams, then:
+**5. Audio.** An ffmpeg-command block that plans one command and executes it
+once. The policy is **pass-through**: leave audio alone if it already
+direct-plays, and only convert what doesn't. `Begin Command` snapshots the
+streams, then:
 
-- `Ensure AC3 384k` creates an English AC3 track if one doesn't already exist,
-  cloned from the highest-channel-count English stream. It requests 6 channels
-  and the plugin clamps to `min(wanted, available)`, so 8ch → 5.1, 6ch → 5.1,
-  2ch → stereo. One bitrate is used for every channel layout: 384k is the rate
-  DVD-Video used for AC3 5.1, and is generous for stereo.
-- `Ensure Audio Stream` matches on codec **and channel count only** — it will
-  not touch a valid AC3 track at the wrong bitrate. So `Audio <= 384kbps?`
-  catches files whose AC3 track is at some other rate and routes them through
-  `Force AC3 384k`, which appends `-c:a ac3 -b:a 384k` as overall output
-  arguments. ffmpeg's last-matching specifier wins, overriding the per-stream
-  `-c:N copy`, and the audio is re-encoded. That node sits on the out-of-range
-  branch only: Custom Arguments unconditionally sets `shouldProcess`, so wiring
-  it inline would remux every file on every scan forever.
+- Three `checkAudioCodec` nodes ask in turn whether the file already has
+  `eac3`, `ac3` or `aac`. Any hit skips straight to the drop step — no
+  re-encode. This is the whole point of the design: a library sweep found ~90%
+  of shows already carry one of those three, so normalising everything to a
+  single codec meant re-encoding almost the entire library for no playback
+  benefit.
+- Only if none of the three is present does `Ensure EAC3 384k` run, cloning the
+  highest-channel-count English stream into E-AC3. It requests 6 channels and
+  the plugin clamps to `min(wanted, available)`, so 8ch → 5.1, 6ch → 5.1,
+  2ch → stereo. In practice this fires on DTS, TrueHD, FLAC, Opus, Vorbis and
+  MP3 sources.
+- `Drop Incompatible Audio` then removes any audio stream whose `codec_name` is
+  not one of `eac3,ac3,aac`. The condition must be **`not_equals`**, not
+  `not_includes` — the plugin does substring matching for `includes`, and
+  `"eac3".includes("ac3")` is true, which would silently keep the wrong
+  streams.
+- Files keep whatever bitrate they arrived with. Nothing is normalised
+  downwards; the flow preserves rather than re-encodes.
 - `Drop Non-AC3 Audio` removes every audio stream whose `codec_name` is not
   `ac3`, leaving only the track Ensure created or kept.
 - `Reorder Streams` sorts to video → audio → subtitles, highest channel count
@@ -133,21 +140,25 @@ flowchart TD
     CLEANA[Remove Non English Audio] --> CLEANS[Remove Non English Subs]
     CLEANS --> START[Begin Command]
 
-    START --> ENS[Ensure AC3 384k]
-    ENS --> BR{Audio &lt;= 384kbps?}
-    BR -->|yes| DROP[Drop Non-AC3 Audio]
-    BR -->|no| CUST[Force AC3 384k]
-    CUST --> DROP
+    START --> K1{Has EAC3?}
+    K1 -->|yes| DROP[Drop Incompatible Audio]
+    K1 -->|no| K2{Has AC3?}
+    K2 -->|yes| DROP
+    K2 -->|no| K3{Has AAC?}
+    K3 -->|yes| DROP
+    K3 -->|no| ENS[Ensure EAC3 384k]
+    ENS --> DROP
     DROP --> ORDER[Reorder Streams]
     ORDER --> EXEC[Execute]
     EXEC --> PROP3[Run MKVPropEdit]
     PROP3 --> REPL[Replace Original File]
 
-    subgraph audio [Audio normalisation ffmpeg command block]
+    subgraph audio [Audio ffmpeg command block]
         START
+        K1
+        K2
+        K3
         ENS
-        BR
-        CUST
         DROP
         ORDER
         EXEC
@@ -160,11 +171,18 @@ flowchart TD
   `Migz1FFMPEG` / `Migz1FFMPEG_CPU`; QuickSync uses `Boosh_FFMPEG_QSV_HEVC`.
   They have different bitrate logic, so output size varies by which node picks
   up a file. All three are now pinned explicitly.
+- **Files with several acceptable audio tracks keep all of them.** `Drop
+  Incompatible Audio` filters by codec, not by count, so a file carrying (say)
+  eight English aac/eac3 streams keeps all eight — the "one audio stream" goal
+  is not enforced. `CleanAudio` catches non-English and commentary tracks
+  upstream, which handles the common case but not this one. A library sweep
+  found ~2% of shows affected. Fixing it properly needs a small local flow
+  plugin; there is no stock "keep only the first audio stream" plugin.
 - **Already-processed files are never downgraded in channel count.** Ensure only
   adds a track when none matches; it won't rebuild a stereo track from a
   surround source after the fact.
-- **Bitrate normalisation is lossy→lossy.** Any file whose AC3 track isn't at
-  384k gets re-encoded. The first AC3 encode from a lossless source is
-  effectively transparent, so the second generation starts from near-original
-  material — but it is still a generation, and AC3 degrades least gracefully on
-  dense, transient-heavy audio (applause, cymbals, orchestral score).
+- **E-AC3 cannot be bitstreamed over optical/S/PDIF**, which carries only AC3
+  and DTS. Over HDMI/eARC this is a non-issue. If a client can't handle E-AC3 it
+  transcodes server-side — a performance cost, not a broken file.
+- **AV1 sources are transcoded to HEVC**, which is backwards efficiency-wise.
+  One show in the library is affected.

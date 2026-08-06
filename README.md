@@ -94,8 +94,6 @@ streams, then:
   streams.
 - Files keep whatever bitrate they arrived with. Nothing is normalised
   downwards; the flow preserves rather than re-encodes.
-- `Drop Non-AC3 Audio` removes every audio stream whose `codec_name` is not
-  `ac3`, leaving only the track Ensure created or kept.
 - `Reorder Streams` sorts to video → audio → subtitles, highest channel count
   first within audio.
 - `Execute` builds and runs the command. Streams with no output args get

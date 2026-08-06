@@ -7,7 +7,8 @@
     "test:findings": "vitest run --config vitest.findings.config.ts",
     "typecheck": "tsc --noEmit",
     "lint:flow": "tdarr-test lint flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --ignore missing-error-edge:audProped",
-    "prepare": "husky"
+    "prepare": "husky",
+    "fuzz": "tdarr-test fuzz flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

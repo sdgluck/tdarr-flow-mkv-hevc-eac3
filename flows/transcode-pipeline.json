@@ -8,12 +8,12 @@
       "sourceRepo": "Community",
       "pluginName": "resetFlowError",
       "version": "1.0.0",
+      "fpEnabled": true,
       "id": "XiP0F7Njs",
       "position": {
         "x": 792,
         "y": -624
-      },
-      "fpEnabled": true
+      }
     },
     {
       "name": "Run MKVPropEdit",
@@ -101,14 +101,14 @@
       "sourceRepo": "Community",
       "pluginName": "runClassicTranscodePlugin",
       "version": "2.0.0",
+      "inputsDB": {
+        "pluginSourceId": "Community:Tdarr_Plugin_MC93_Migz1FFMPEG_CPU"
+      },
       "fpEnabled": true,
       "id": "audCpuEnc",
       "position": {
         "x": 1140,
         "y": -120
-      },
-      "inputsDB": {
-        "pluginSourceId": "Community:Tdarr_Plugin_MC93_Migz1FFMPEG_CPU"
       }
     },
     {
@@ -116,14 +116,14 @@
       "sourceRepo": "Community",
       "pluginName": "runClassicTranscodePlugin",
       "version": "2.0.0",
+      "inputsDB": {
+        "pluginSourceId": "Community:Tdarr_Plugin_MC93_Migz1FFMPEG"
+      },
       "fpEnabled": true,
       "id": "aRB7_yBQE",
       "position": {
         "x": 756,
         "y": -108
-      },
-      "inputsDB": {
-        "pluginSourceId": "Community:Tdarr_Plugin_MC93_Migz1FFMPEG"
       }
     },
     {
@@ -204,15 +204,15 @@
       "sourceRepo": "Community",
       "pluginName": "checkAudioCodec",
       "version": "1.0.0",
+      "inputsDB": {
+        "codec": "eac3",
+        "checkBitrate": "false"
+      },
       "fpEnabled": true,
       "id": "audChkEac",
       "position": {
         "x": 624,
         "y": 384
-      },
-      "inputsDB": {
-        "codec": "eac3",
-        "checkBitrate": "false"
       }
     },
     {
@@ -220,15 +220,15 @@
       "sourceRepo": "Community",
       "pluginName": "checkAudioCodec",
       "version": "1.0.0",
+      "inputsDB": {
+        "codec": "ac3",
+        "checkBitrate": "false"
+      },
       "fpEnabled": true,
       "id": "audChkAc3",
       "position": {
         "x": 624,
         "y": 456
-      },
-      "inputsDB": {
-        "codec": "ac3",
-        "checkBitrate": "false"
       }
     },
     {
@@ -236,15 +236,15 @@
       "sourceRepo": "Community",
       "pluginName": "checkAudioCodec",
       "version": "1.0.0",
+      "inputsDB": {
+        "codec": "aac",
+        "checkBitrate": "false"
+      },
       "fpEnabled": true,
       "id": "audChkAac",
       "position": {
         "x": 624,
         "y": 528
-      },
-      "inputsDB": {
-        "codec": "aac",
-        "checkBitrate": "false"
       }
     },
     {
@@ -252,12 +252,6 @@
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandEnsureAudioStream",
       "version": "1.0.0",
-      "fpEnabled": true,
-      "id": "audEnsure1",
-      "position": {
-        "x": 444,
-        "y": 600
-      },
       "inputsDB": {
         "audioEncoder": "eac3",
         "language": "eng",
@@ -266,6 +260,12 @@
         "bitrate": "384k",
         "enableSamplerate": "false",
         "samplerate": "48k"
+      },
+      "fpEnabled": true,
+      "id": "audEnsure1",
+      "position": {
+        "x": 444,
+        "y": 600
       }
     },
     {
@@ -273,17 +273,17 @@
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandRemoveStreamByProperty",
       "version": "1.0.0",
-      "fpEnabled": true,
-      "id": "audStrip01",
-      "position": {
-        "x": 624,
-        "y": 672
-      },
       "inputsDB": {
         "codecType": "audio",
         "propertyToCheck": "codec_name",
         "valuesToRemove": "eac3,ac3,aac",
         "condition": "not_equals"
+      },
+      "fpEnabled": true,
+      "id": "audStrip01",
+      "position": {
+        "x": 624,
+        "y": 672
       }
     },
     {
@@ -303,14 +303,14 @@
       "sourceRepo": "Local",
       "pluginName": "keepOneAudioStream",
       "version": "1.0.0",
+      "inputsDB": {
+        "language": "eng"
+      },
       "fpEnabled": true,
       "id": "audKeep1",
       "position": {
         "x": 624,
         "y": 744
-      },
-      "inputsDB": {
-        "language": "eng"
       }
     },
     {
@@ -318,18 +318,18 @@
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandRorderStreams",
       "version": "1.0.0",
-      "fpEnabled": true,
-      "id": "audReorder",
-      "position": {
-        "x": 624,
-        "y": 816
-      },
       "inputsDB": {
         "processOrder": "codecs,channels,languages,streamTypes",
         "languages": "",
         "channels": "7.1,5.1,2,1",
         "codecs": "",
         "streamTypes": "video,audio,subtitle"
+      },
+      "fpEnabled": true,
+      "id": "audReorder",
+      "position": {
+        "x": 624,
+        "y": 816
       }
     },
     {
@@ -337,16 +337,16 @@
       "sourceRepo": "Community",
       "pluginName": "checkFlowVariable",
       "version": "1.0.0",
+      "inputsDB": {
+        "variable": "{{{args.variables.ffmpegCommand.shouldProcess}}}",
+        "condition": "==",
+        "value": "false"
+      },
       "fpEnabled": true,
       "id": "audChgChk",
       "position": {
         "x": 624,
         "y": 888
-      },
-      "inputsDB": {
-        "variable": "{{{args.variables.ffmpegCommand.shouldProcess}}}",
-        "condition": "==",
-        "value": "false"
       }
     },
     {
@@ -378,14 +378,14 @@
       "sourceRepo": "Community",
       "pluginName": "runClassicTranscodePlugin",
       "version": "1.0.0",
+      "inputsDB": {
+        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_ForceRemuxMKV"
+      },
+      "fpEnabled": true,
       "id": "TOqGPovz0",
       "position": {
         "x": 792,
         "y": -552
-      },
-      "fpEnabled": true,
-      "inputsDB": {
-        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_ForceRemuxMKV"
       }
     },
     {
@@ -393,27 +393,27 @@
       "sourceRepo": "Community",
       "pluginName": "resetFlowError",
       "version": "1.0.0",
+      "fpEnabled": true,
       "id": "7ralhn4Ji",
       "position": {
         "x": 1008,
         "y": -480
-      },
-      "fpEnabled": true
+      }
     },
     {
       "name": "Nvidia?",
       "sourceRepo": "Community",
       "pluginName": "checkFlowVariable",
       "version": "1.0.0",
+      "inputsDB": {
+        "variable": "{{{args.configVars.config.nodeName}}}",
+        "value": "Nvidia"
+      },
+      "fpEnabled": true,
       "id": "wNsKwyZEu",
       "position": {
         "x": 780,
         "y": -264
-      },
-      "fpEnabled": true,
-      "inputsDB": {
-        "variable": "{{{args.configVars.config.nodeName}}}",
-        "value": "Nvidia"
       }
     },
     {
@@ -421,15 +421,15 @@
       "sourceRepo": "Community",
       "pluginName": "checkFlowVariable",
       "version": "1.0.0",
+      "inputsDB": {
+        "variable": "{{{args.configVars.config.nodeName}}}",
+        "value": "Intel"
+      },
+      "fpEnabled": true,
       "id": "9m5iVBMU3",
       "position": {
         "x": 960,
         "y": -192
-      },
-      "fpEnabled": true,
-      "inputsDB": {
-        "variable": "{{{args.configVars.config.nodeName}}}",
-        "value": "Intel"
       }
     },
     {
@@ -437,15 +437,15 @@
       "sourceRepo": "Community",
       "pluginName": "checkFileSize",
       "version": "1.0.0",
+      "inputsDB": {
+        "unit": "MB",
+        "lessThan": "100"
+      },
+      "fpEnabled": true,
       "id": "C5tbUCt6p",
       "position": {
         "x": 564,
         "y": -408
-      },
-      "fpEnabled": true,
-      "inputsDB": {
-        "unit": "MB",
-        "lessThan": "100"
       }
     }
   ],
@@ -455,450 +455,350 @@
       "sourceHandle": "1",
       "target": "7yXBj4-aC",
       "targetHandle": null,
-      "id": "edge2",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge2"
     },
     {
       "source": "M_mrP-J_d",
       "sourceHandle": "2",
       "target": "C5tbUCt6p",
       "targetHandle": null,
-      "id": "edge3",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge3"
     },
     {
       "source": "3AOkEqifp",
       "sourceHandle": "1",
       "target": "aQKzSWY-r",
       "targetHandle": null,
-      "id": "edge5",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge5"
     },
     {
       "source": "JBA2N2W7L",
       "sourceHandle": "1",
       "target": "aQKzSWY-r",
       "targetHandle": null,
-      "id": "edge14",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge14"
     },
     {
       "source": "JBA2N2W7L",
       "sourceHandle": "2",
       "target": "aQKzSWY-r",
       "targetHandle": null,
-      "id": "edge15",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge15"
     },
     {
       "source": "JBA2N2W7L",
       "sourceHandle": "3",
       "target": "ksKmTCZB0",
       "targetHandle": null,
-      "id": "edge16",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge16"
     },
     {
       "source": "ksKmTCZB0",
       "sourceHandle": "1",
       "target": "aQKzSWY-r",
       "targetHandle": null,
-      "id": "edge17",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge17"
     },
     {
       "source": "aQKzSWY-r",
       "sourceHandle": "1",
       "target": "ZvfzKZ6Nw",
       "targetHandle": null,
-      "id": "edge18",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge18"
     },
     {
       "source": "aQKzSWY-r",
       "sourceHandle": "2",
       "target": "ZvfzKZ6Nw",
       "targetHandle": null,
-      "id": "edge19",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge19"
     },
     {
       "source": "ZvfzKZ6Nw",
       "sourceHandle": "1",
       "target": "audStart01",
       "targetHandle": null,
-      "id": "edge20",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge20"
     },
     {
       "source": "ZvfzKZ6Nw",
       "sourceHandle": "2",
       "target": "audStart01",
       "targetHandle": null,
-      "id": "edge21",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "edge21"
     },
     {
       "source": "aRB7_yBQE",
       "sourceHandle": "1",
       "target": "JBA2N2W7L",
       "targetHandle": null,
-      "id": "bWVT2NLZV",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "bWVT2NLZV"
     },
     {
       "source": "aRB7_yBQE",
       "sourceHandle": "2",
       "target": "JBA2N2W7L",
       "targetHandle": null,
-      "id": "bMpfM6Shn",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "bMpfM6Shn"
     },
     {
       "source": "L5oZNsSMG",
       "sourceHandle": "1",
       "target": "JBA2N2W7L",
       "targetHandle": null,
-      "id": "v9FWZT2Js",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "v9FWZT2Js"
     },
     {
       "source": "L5oZNsSMG",
       "sourceHandle": "2",
       "target": "JBA2N2W7L",
       "targetHandle": null,
-      "id": "QVdsrUnkB",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "QVdsrUnkB"
     },
     {
       "source": "TOqGPovz0",
       "sourceHandle": "1",
       "target": "yXW_0oE2B",
       "targetHandle": null,
-      "id": "wmHT3kCB6",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "wmHT3kCB6"
     },
     {
       "source": "TOqGPovz0",
       "sourceHandle": "err1",
       "target": "7ralhn4Ji",
       "targetHandle": null,
-      "id": "BwX7-gQDW",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "BwX7-gQDW"
     },
     {
       "source": "yXW_0oE2B",
       "sourceHandle": "err1",
       "target": "7ralhn4Ji",
       "targetHandle": null,
-      "id": "mQtZIVlli",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "mQtZIVlli"
     },
     {
       "source": "wNsKwyZEu",
       "sourceHandle": "1",
       "target": "aRB7_yBQE",
       "targetHandle": null,
-      "id": "ukHpWxtsh",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "ukHpWxtsh"
     },
     {
       "source": "9m5iVBMU3",
       "sourceHandle": "1",
       "target": "L5oZNsSMG",
       "targetHandle": null,
-      "id": "BBFN7JR59",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "BBFN7JR59"
     },
     {
       "source": "3AOkEqifp",
       "sourceHandle": "2",
       "target": "wNsKwyZEu",
       "targetHandle": null,
-      "id": "7wBG7k4Lh",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "7wBG7k4Lh"
     },
     {
       "source": "wNsKwyZEu",
       "sourceHandle": "2",
       "target": "9m5iVBMU3",
       "targetHandle": null,
-      "id": "z3kXx_PFQ",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "z3kXx_PFQ"
     },
     {
       "source": "XiP0F7Njs",
       "sourceHandle": "1",
       "target": "TOqGPovz0",
       "targetHandle": null,
-      "id": "8OtZY04_C",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "8OtZY04_C"
     },
     {
       "source": "M_mrP-J_d",
       "sourceHandle": "err1",
       "target": "XiP0F7Njs",
       "targetHandle": null,
-      "id": "X6boKnrkx",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "X6boKnrkx"
     },
     {
       "source": "7yXBj4-aC",
       "sourceHandle": "err1",
       "target": "XiP0F7Njs",
       "targetHandle": null,
-      "id": "LCG623d-i",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "LCG623d-i"
     },
     {
       "source": "7yXBj4-aC",
       "sourceHandle": "1",
       "target": "C5tbUCt6p",
       "targetHandle": null,
-      "id": "eitpIm3YO",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "eitpIm3YO"
     },
     {
       "source": "yXW_0oE2B",
       "sourceHandle": "1",
       "target": "C5tbUCt6p",
       "targetHandle": null,
-      "id": "NbRLAjqSf",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "NbRLAjqSf"
     },
     {
       "source": "7ralhn4Ji",
       "sourceHandle": "1",
       "target": "C5tbUCt6p",
       "targetHandle": null,
-      "id": "f9Ts5nvuj",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "f9Ts5nvuj"
     },
     {
       "source": "C5tbUCt6p",
       "sourceHandle": "2",
       "target": "3AOkEqifp",
       "targetHandle": null,
-      "id": "O6Up2fEXG",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "O6Up2fEXG"
     },
     {
       "source": "C5tbUCt6p",
       "sourceHandle": "1",
       "target": "aQKzSWY-r",
       "targetHandle": null,
-      "id": "7-7I5iEjn",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "7-7I5iEjn"
     },
     {
       "source": "_YTuyCZg3",
       "sourceHandle": "1",
       "target": "M_mrP-J_d",
       "targetHandle": null,
-      "id": "Xuczobv0P",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "Xuczobv0P"
     },
     {
       "source": "audReorder",
       "sourceHandle": "1",
       "target": "audExec001",
       "targetHandle": null,
-      "id": "aud-e12",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e12"
     },
     {
       "source": "audProped",
       "sourceHandle": "1",
       "target": "XLXwY90TH",
       "targetHandle": null,
-      "id": "aud-e13",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e13"
     },
     {
       "source": "audProped",
       "sourceHandle": "err1",
       "target": "XLXwY90TH",
       "targetHandle": null,
-      "id": "aud-e14",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e14"
     },
     {
       "source": "9m5iVBMU3",
       "sourceHandle": "2",
       "target": "audCpuEnc",
       "targetHandle": null,
-      "id": "cpu-e1",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "cpu-e1"
     },
     {
       "source": "audCpuEnc",
       "sourceHandle": "1",
       "target": "JBA2N2W7L",
       "targetHandle": null,
-      "id": "cpu-e2",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "cpu-e2"
     },
     {
       "source": "audCpuEnc",
       "sourceHandle": "2",
       "target": "JBA2N2W7L",
       "targetHandle": null,
-      "id": "cpu-e3",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "cpu-e3"
     },
     {
       "source": "audStart01",
       "sourceHandle": "1",
       "target": "audChkEac",
       "targetHandle": null,
-      "id": "aud-e3",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e3"
     },
     {
       "source": "audChkEac",
       "sourceHandle": "1",
       "target": "audStrip01",
       "targetHandle": null,
-      "id": "aud-e20",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e20"
     },
     {
       "source": "audChkEac",
       "sourceHandle": "2",
       "target": "audChkAc3",
       "targetHandle": null,
-      "id": "aud-e21",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e21"
     },
     {
       "source": "audChkAc3",
       "sourceHandle": "1",
       "target": "audStrip01",
       "targetHandle": null,
-      "id": "aud-e22",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e22"
     },
     {
       "source": "audChkAc3",
       "sourceHandle": "2",
       "target": "audChkAac",
       "targetHandle": null,
-      "id": "aud-e23",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e23"
     },
     {
       "source": "audChkAac",
       "sourceHandle": "1",
       "target": "audStrip01",
       "targetHandle": null,
-      "id": "aud-e24",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e24"
     },
     {
       "source": "audChkAac",
       "sourceHandle": "2",
       "target": "audEnsure1",
       "targetHandle": null,
-      "id": "aud-e25",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e25"
     },
     {
       "source": "audEnsure1",
       "sourceHandle": "1",
       "target": "audStrip01",
       "targetHandle": null,
-      "id": "aud-e4",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e4"
     },
     {
       "source": "audStrip01",
       "sourceHandle": "1",
       "target": "audKeep1",
       "targetHandle": null,
-      "id": "aud-e5",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e5"
     },
     {
       "source": "audKeep1",
       "sourceHandle": "1",
       "target": "audReorder",
       "targetHandle": null,
-      "id": "aud-e26",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e26"
     },
     {
       "source": "audExec001",
       "sourceHandle": "1",
       "target": "audChgChk",
       "targetHandle": null,
-      "id": "aud-e6",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e6"
     },
     {
       "source": "audChgChk",
       "sourceHandle": "1",
       "target": "XLXwY90TH",
       "targetHandle": null,
-      "id": "aud-e27",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e27"
     },
     {
       "source": "audChgChk",
       "sourceHandle": "2",
       "target": "audProped",
       "targetHandle": null,
-      "id": "aud-e28",
-      "animated": true,
-      "type": "smoothstep"
+      "id": "aud-e28"
     }
   ],
   "isUiLocked": false

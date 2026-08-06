@@ -61,10 +61,11 @@ Either way it lands on `Run MKVPropEdit`, which writes track statistics tags.
 subtitle cleanup, skipping video transcode entirely — not worth the GPU time.
 
 **3. Video.** `Is HEVC?` skips anything already HEVC. Otherwise the flow picks
-an encoder by node name: `Nvidia?` routes to NVENC, else `Intel?` routes to
-QuickSync (`Boosh_FFMPEG_QSV_HEVC`). `Compare File Size Ratio` then guards the
-result — if the new file isn't smaller, `Set Original File` discards it and the
-original is kept.
+an encoder by node name: `Nvidia?` routes to NVENC (`Migz1FFMPEG`), `Intel?` to
+QuickSync (`Boosh_FFMPEG_QSV_HEVC`), and anything else falls back to a CPU
+encode (`Migz1FFMPEG_CPU`) rather than being handed the wrong GPU path.
+`Compare File Size Ratio` then guards the result — if the new file isn't
+smaller, `Set Original File` discards it and the original is kept.
 
 **4. Language cleanup.** `Remove Non English Audio` and `Remove Non English Subs`
 (local `CleanAudio` / `CleanSubs`) strip non-English tracks and commentary. SDH
@@ -120,9 +121,11 @@ flowchart TD
     HEVC -->|no| NV{Nvidia?}
     NV -->|yes| ENC1[Transcode HEVC NVENC]
     NV -->|no| INTEL{Intel?}
-    INTEL --> ENC2[Transcode HEVC QuickSync]
+    INTEL -->|yes| ENC2[Transcode HEVC QuickSync]
+    INTEL -->|no| ENC3[Transcode HEVC CPU]
     ENC1 --> RATIO{Smaller?}
     ENC2 --> RATIO
+    ENC3 --> RATIO
     RATIO -->|yes| CLEANA
     RATIO -->|no| ORIG[Set Original File]
     ORIG --> CLEANA
@@ -153,12 +156,10 @@ flowchart TD
 
 ## Known wrinkles
 
-- **`Transcode HEVC (Nvidia)` has no `pluginSourceId`**, so it falls back to
-  `Community:Tdarr_Plugin_MC93_Migz1FFMPEG`. The QuickSync node pins its plugin
-  explicitly. The two paths therefore use different plugins with different
-  bitrate logic.
-- **`Intel?` routes both outputs to QuickSync**, so a node named anything other
-  than `Nvidia` gets the QSV path regardless.
+- **The three encoder paths use different plugins.** NVENC and CPU use
+  `Migz1FFMPEG` / `Migz1FFMPEG_CPU`; QuickSync uses `Boosh_FFMPEG_QSV_HEVC`.
+  They have different bitrate logic, so output size varies by which node picks
+  up a file. All three are now pinned explicitly.
 - **Already-processed files are never downgraded in channel count.** Ensure only
   adds a track when none matches; it won't rebuild a stereo track from a
   surround source after the fact.

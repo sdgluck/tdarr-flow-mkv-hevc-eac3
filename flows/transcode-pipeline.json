@@ -97,6 +97,21 @@
       }
     },
     {
+      "name": "Transcode HEVC (CPU)",
+      "sourceRepo": "Community",
+      "pluginName": "runClassicTranscodePlugin",
+      "version": "2.0.0",
+      "fpEnabled": true,
+      "id": "audCpuEnc",
+      "position": {
+        "x": 1140,
+        "y": -120
+      },
+      "inputsDB": {
+        "pluginSourceId": "Community:Tdarr_Plugin_MC93_Migz1FFMPEG_CPU"
+      }
+    },
+    {
       "name": "Transcode HEVC (Nvidia)",
       "sourceRepo": "Community",
       "pluginName": "runClassicTranscodePlugin",
@@ -106,6 +121,9 @@
       "position": {
         "x": 756,
         "y": -108
+      },
+      "inputsDB": {
+        "pluginSourceId": "Community:Tdarr_Plugin_MC93_Migz1FFMPEG"
       }
     },
     {
@@ -566,15 +584,6 @@
       "type": "smoothstep"
     },
     {
-      "source": "9m5iVBMU3",
-      "sourceHandle": "2",
-      "target": "L5oZNsSMG",
-      "targetHandle": null,
-      "id": "rZNd8_UQV",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
       "source": "3AOkEqifp",
       "sourceHandle": "2",
       "target": "wNsKwyZEu",
@@ -769,6 +778,33 @@
       "target": "audEnsure1",
       "targetHandle": null,
       "id": "aud-e3",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "9m5iVBMU3",
+      "sourceHandle": "2",
+      "target": "audCpuEnc",
+      "targetHandle": null,
+      "id": "cpu-e1",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCpuEnc",
+      "sourceHandle": "1",
+      "target": "JBA2N2W7L",
+      "targetHandle": null,
+      "id": "cpu-e2",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCpuEnc",
+      "sourceHandle": "2",
+      "target": "JBA2N2W7L",
+      "targetHandle": null,
+      "id": "cpu-e3",
       "animated": true,
       "type": "smoothstep"
     }

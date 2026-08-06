@@ -55,6 +55,14 @@ Flow plugins are loaded as compiled JavaScript, so the files here are plain JS
 written in the same CommonJS shape the community plugins compile to. Local flow
 plugin nodes reference `"sourceRepo": "Local"` in the flow.
 
+Keep every `require` **inside** the plugin function, never at module top level.
+The UI reads the file to render a node's inputs, and that happens in a context
+where the relative paths to `FlowHelpers` and `methods/lib` do not resolve — a
+top-level require makes the whole module unloadable and the editor shows
+"Unable to read this plugin during loading". Several community plugins
+(`checkAudioCodec`, `checkChannelCount`) follow the same deferred pattern.
+Runtime is unaffected either way, so this fails only in the editor.
+
 Currently one local flow plugin:
 
 - `keepOneAudioStream` — keeps a single audio stream, removing the rest.

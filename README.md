@@ -36,12 +36,20 @@ export strips. `flows/transcode-pipeline.json` is in DB shape and imports fine.
 These are real source files. On the server they live under:
 
 - Classic plugins: `/app/server/Tdarr/Plugins/Local/*.js`
-- Flow plugins: `/app/server/Tdarr/Plugins/FlowPlugins/LocalFlowPlugins/<category>/<name>/<version>/index.js`
+- Flow plugins: `/app/server/Tdarr/Plugins/FlowPlugins/LocalFlowPlugins/<name>/<version>/index.js`
 
-Copy them in preserving that structure — the relative `require`s inside a flow
-plugin (`../../../../FlowHelpers/...`, `../../../../../methods/lib`) depend on
-the exact directory depth, so `<category>/<name>/<version>/index.js` is not
-optional.
+Copy them in preserving that structure. Note local flow plugins have **no
+category directory**, unlike `CommunityFlowPlugins/<category>/<name>/<version>/`
+— they sit directly under `LocalFlowPlugins/`. That makes them one level
+shallower, so their relative `require`s differ from the community ones:
+`../../../FlowHelpers/...` and `../../../../methods/lib`. Getting this wrong
+fails at runtime with `Plugin does not exist: .../LocalFlowPlugins///<name>/...`
+— the empty path segments in that message are the giveaway.
+
+Plugins are resolved on the **node**, at
+`/app/Tdarr_Node/assets/app/plugins/...`, not on the server. Nodes sync their
+copy from the server, so a newly added local plugin may need a node restart
+before it is visible.
 
 Flow plugins are loaded as compiled JavaScript, so the files here are plain JS
 written in the same CommonJS shape the community plugins compile to. Local flow
@@ -49,7 +57,7 @@ plugin nodes reference `"sourceRepo": "Local"` in the flow.
 
 Currently one local flow plugin:
 
-- `audio/keepOneAudioStream` — keeps a single audio stream, removing the rest.
+- `keepOneAudioStream` — keeps a single audio stream, removing the rest.
   Prefers the configured language tag, then the highest channel count, then the
   highest bitrate, then file order. No stock plugin does this.
 

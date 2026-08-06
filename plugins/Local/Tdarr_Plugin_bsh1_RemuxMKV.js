@@ -45,7 +45,12 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     response.infoLog += '☒ Dropping mov_text subtitles (MP4-only, incompatible with MKV).\n';
   }
 
-  response.preset = `, -map 0:V:0 -map 0:a? ${subMap} -c copy -max_muxing_queue_size 9999`.trimEnd();
+  // -fflags +genpts: DivX-packed AVI (and some MPEG-PS) carry packets with no
+  // timestamps. The matroska muxer rejects those outright ("Can't write packet
+  // with unknown timestamp") and emits a truncated file, so the remux must
+  // synthesise timestamps from the frame rate. Input-side flag, hence the
+  // leading position before the comma that separates input and output args.
+  response.preset = `-fflags +genpts, -map 0:V:0 -map 0:a? ${subMap} -c copy -max_muxing_queue_size 9999`.trimEnd();
 
   return response;
 };

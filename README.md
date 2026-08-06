@@ -36,18 +36,31 @@ export strips. `flows/transcode-pipeline.json` is in DB shape and imports fine.
 These are real source files. On the server they live under:
 
 - Classic plugins: `/app/server/Tdarr/Plugins/Local/*.js`
-- Flow plugins: `/app/server/Tdarr/Plugins/FlowPlugins/LocalFlowPlugins/<name>/<version>/index.js`
+- Flow plugins: `/app/server/Tdarr/Plugins/FlowPlugins/LocalFlowPlugins/<category>/<name>/<version>/index.js`
 
-Copy them in preserving that structure. `LocalFlowPlugins` is currently empty —
-everything in use is either a community flow plugin or a local classic plugin.
+Copy them in preserving that structure — the relative `require`s inside a flow
+plugin (`../../../../FlowHelpers/...`, `../../../../../methods/lib`) depend on
+the exact directory depth, so `<category>/<name>/<version>/index.js` is not
+optional.
+
+Flow plugins are loaded as compiled JavaScript, so the files here are plain JS
+written in the same CommonJS shape the community plugins compile to. Local flow
+plugin nodes reference `"sourceRepo": "Local"` in the flow.
+
+Currently one local flow plugin:
+
+- `audio/keepOneAudioStream` — keeps a single audio stream, removing the rest.
+  Prefers the configured language tag, then the highest channel count, then the
+  highest bitrate, then file order. No stock plugin does this.
 
 ---
 
 # Transcode Pipeline
 
 The single flow (`a_CeSjPzb`) applied to the TV library. Its job: get every file
-to MKV + HEVC video + exactly one English AC3 audio track + English subtitles,
-in that stream order, with accurate track statistics.
+to MKV + HEVC video + exactly one English audio track in a directly playable
+codec + English subtitles, in that stream order, with accurate track statistics.
+Audio is left alone wherever it already direct-plays.
 
 ## Stages
 
@@ -92,6 +105,10 @@ streams, then:
   `not_includes` — the plugin does substring matching for `includes`, and
   `"eac3".includes("ac3")` is true, which would silently keep the wrong
   streams.
+- `Keep One Audio Stream` (local plugin) then reduces whatever survived to a
+  single track. It runs *after* the codec drop deliberately: picking a favourite
+  first could select a DTS track that the drop step then removes, leaving the
+  file with no audio at all.
 - Files keep whatever bitrate they arrived with. Nothing is normalised
   downwards; the flow preserves rather than re-encodes.
 - `Reorder Streams` sorts to video → audio → subtitles, highest channel count
@@ -146,7 +163,8 @@ flowchart TD
     K3 -->|yes| DROP
     K3 -->|no| ENS[Ensure EAC3 384k]
     ENS --> DROP
-    DROP --> ORDER[Reorder Streams]
+    DROP --> KEEP[Keep One Audio Stream]
+    KEEP --> ORDER[Reorder Streams]
     ORDER --> EXEC[Execute]
     EXEC --> PROP3[Run MKVPropEdit]
     PROP3 --> REPL[Replace Original File]
@@ -158,6 +176,7 @@ flowchart TD
         K3
         ENS
         DROP
+        KEEP
         ORDER
         EXEC
     end
@@ -169,13 +188,9 @@ flowchart TD
   `Migz1FFMPEG` / `Migz1FFMPEG_CPU`; QuickSync uses `Boosh_FFMPEG_QSV_HEVC`.
   They have different bitrate logic, so output size varies by which node picks
   up a file. All three are now pinned explicitly.
-- **Files with several acceptable audio tracks keep all of them.** `Drop
-  Incompatible Audio` filters by codec, not by count, so a file carrying (say)
-  eight English aac/eac3 streams keeps all eight — the "one audio stream" goal
-  is not enforced. `CleanAudio` catches non-English and commentary tracks
-  upstream, which handles the common case but not this one. A library sweep
-  found ~2% of shows affected. Fixing it properly needs a small local flow
-  plugin; there is no stock "keep only the first audio stream" plugin.
+- **`keepOneAudioStream` is a local plugin**, so it lives only in this repo and
+  on the server — it is not maintained upstream and will not survive a plugin
+  folder wipe. Re-copy it from `plugins/` if the server is rebuilt.
 - **Already-processed files are never downgraded in channel count.** Ensure only
   adds a track when none matches; it won't rebuild a stereo track from a
   surround source after the fact.

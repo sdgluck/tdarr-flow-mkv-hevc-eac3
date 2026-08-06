@@ -295,7 +295,22 @@
       "id": "audExec001",
       "position": {
         "x": 624,
-        "y": 816
+        "y": 888
+      }
+    },
+    {
+      "name": "Keep One Audio Stream",
+      "sourceRepo": "Local",
+      "pluginName": "keepOneAudioStream",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "audKeep1",
+      "position": {
+        "x": 624,
+        "y": 744
+      },
+      "inputsDB": {
+        "language": "eng"
       }
     },
     {
@@ -307,7 +322,7 @@
       "id": "audReorder",
       "position": {
         "x": 624,
-        "y": 744
+        "y": 816
       },
       "inputsDB": {
         "processOrder": "codecs,channels,languages,streamTypes",
@@ -326,7 +341,7 @@
       "id": "audProped",
       "position": {
         "x": 624,
-        "y": 888
+        "y": 960
       }
     },
     {
@@ -338,7 +353,7 @@
       "id": "XLXwY90TH",
       "position": {
         "x": 624,
-        "y": 960
+        "y": 1032
       }
     },
     {
@@ -698,15 +713,6 @@
       "type": "smoothstep"
     },
     {
-      "source": "audStrip01",
-      "sourceHandle": "1",
-      "target": "audReorder",
-      "targetHandle": null,
-      "id": "aud-e5",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
       "source": "audReorder",
       "sourceHandle": "1",
       "target": "audExec001",
@@ -838,6 +844,24 @@
       "target": "audStrip01",
       "targetHandle": null,
       "id": "aud-e4",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audStrip01",
+      "sourceHandle": "1",
+      "target": "audKeep1",
+      "targetHandle": null,
+      "id": "aud-e5",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audKeep1",
+      "sourceHandle": "1",
+      "target": "audReorder",
+      "targetHandle": null,
+      "id": "aud-e26",
       "animated": true,
       "type": "smoothstep"
     }

@@ -1,0 +1,551 @@
+{
+  "_id": "a_CeSjPzb",
+  "name": "Transcode Pipeline",
+  "priority": 0,
+  "flowPlugins": [
+    {
+      "name": "Reset Flow Error",
+      "sourceRepo": "Community",
+      "pluginName": "resetFlowError",
+      "version": "1.0.0",
+      "id": "XiP0F7Njs",
+      "position": {
+        "x": 792,
+        "y": -624
+      },
+      "fpEnabled": true
+    },
+    {
+      "name": "Run MKVPropEdit",
+      "sourceRepo": "Community",
+      "pluginName": "runMkvPropEdit",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "yXW_0oE2B",
+      "position": {
+        "x": 792,
+        "y": -480
+      }
+    },
+    {
+      "name": "Input File",
+      "sourceRepo": "Community",
+      "pluginName": "inputFile",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "_YTuyCZg3",
+      "position": {
+        "x": 564,
+        "y": -732
+      }
+    },
+    {
+      "name": "Remux & Heal Container",
+      "sourceRepo": "Community",
+      "pluginName": "runClassicTranscodePlugin",
+      "version": "2.0.0",
+      "inputsDB": {
+        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_RemuxMKV"
+      },
+      "fpEnabled": true,
+      "id": "M_mrP-J_d",
+      "position": {
+        "x": 564,
+        "y": -552
+      }
+    },
+    {
+      "name": "Run MKVPropEdit",
+      "sourceRepo": "Community",
+      "pluginName": "runMkvPropEdit",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "7yXBj4-aC",
+      "position": {
+        "x": 564,
+        "y": -480
+      }
+    },
+    {
+      "name": "Is HEVC?",
+      "sourceRepo": "Community",
+      "pluginName": "checkVideoCodec",
+      "version": "1.0.0",
+      "inputsDB": {
+        "codec": "hevc"
+      },
+      "fpEnabled": true,
+      "id": "3AOkEqifp",
+      "position": {
+        "x": 648,
+        "y": -336
+      }
+    },
+    {
+      "name": "Transcode HEVC (QuickSync)",
+      "sourceRepo": "Community",
+      "pluginName": "runClassicTranscodePlugin",
+      "version": "2.0.0",
+      "inputsDB": {
+        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_Boosh_FFMPEG_QSV_HEVC"
+      },
+      "fpEnabled": true,
+      "id": "L5oZNsSMG",
+      "position": {
+        "x": 960,
+        "y": -120
+      }
+    },
+    {
+      "name": "Transcode HEVC (Nvidia)",
+      "sourceRepo": "Community",
+      "pluginName": "runClassicTranscodePlugin",
+      "version": "2.0.0",
+      "fpEnabled": true,
+      "id": "aRB7_yBQE",
+      "position": {
+        "x": 756,
+        "y": -108
+      }
+    },
+    {
+      "name": "Compare File Size Ratio",
+      "sourceRepo": "Community",
+      "pluginName": "compareFileSizeRatio",
+      "version": "2.0.0",
+      "inputsDB": {
+        "greaterThan": "0",
+        "lessThan": "100"
+      },
+      "fpEnabled": true,
+      "id": "JBA2N2W7L",
+      "position": {
+        "x": 864,
+        "y": -36
+      }
+    },
+    {
+      "name": "Set Original File",
+      "sourceRepo": "Community",
+      "pluginName": "setOriginalFile",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "ksKmTCZB0",
+      "position": {
+        "x": 900,
+        "y": 96
+      }
+    },
+    {
+      "name": "Remove Non English Audio",
+      "sourceRepo": "Community",
+      "pluginName": "runClassicTranscodePlugin",
+      "version": "2.0.0",
+      "inputsDB": {
+        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_CleanAudio",
+        "remove_commentary": "true"
+      },
+      "fpEnabled": true,
+      "id": "aQKzSWY-r",
+      "position": {
+        "x": 624,
+        "y": 168
+      }
+    },
+    {
+      "name": "Remove Non English Subs",
+      "sourceRepo": "Community",
+      "pluginName": "runClassicTranscodePlugin",
+      "version": "2.0.0",
+      "inputsDB": {
+        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_CleanSubs",
+        "remove_commentary": "true",
+        "remove_sdh": "false"
+      },
+      "fpEnabled": true,
+      "id": "ZvfzKZ6Nw",
+      "position": {
+        "x": 624,
+        "y": 240
+      }
+    },
+    {
+      "name": "Replace Original File",
+      "sourceRepo": "Community",
+      "pluginName": "replaceOriginalFile",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "XLXwY90TH",
+      "position": {
+        "x": 624,
+        "y": 312
+      }
+    },
+    {
+      "name": "Force Remux",
+      "sourceRepo": "Community",
+      "pluginName": "runClassicTranscodePlugin",
+      "version": "1.0.0",
+      "id": "TOqGPovz0",
+      "position": {
+        "x": 792,
+        "y": -552
+      },
+      "fpEnabled": true,
+      "inputsDB": {
+        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_ForceRemuxMKV"
+      }
+    },
+    {
+      "name": "Reset Flow Error",
+      "sourceRepo": "Community",
+      "pluginName": "resetFlowError",
+      "version": "1.0.0",
+      "id": "7ralhn4Ji",
+      "position": {
+        "x": 1008,
+        "y": -480
+      },
+      "fpEnabled": true
+    },
+    {
+      "name": "Nvidia?",
+      "sourceRepo": "Community",
+      "pluginName": "checkFlowVariable",
+      "version": "1.0.0",
+      "id": "wNsKwyZEu",
+      "position": {
+        "x": 780,
+        "y": -264
+      },
+      "fpEnabled": true,
+      "inputsDB": {
+        "variable": "{{{args.configVars.config.nodeName}}}",
+        "value": "Nvidia"
+      }
+    },
+    {
+      "name": "Intel?",
+      "sourceRepo": "Community",
+      "pluginName": "checkFlowVariable",
+      "version": "1.0.0",
+      "id": "9m5iVBMU3",
+      "position": {
+        "x": 960,
+        "y": -192
+      },
+      "fpEnabled": true,
+      "inputsDB": {
+        "variable": "{{{args.configVars.config.nodeName}}}",
+        "value": "Intel"
+      }
+    },
+    {
+      "name": "File <= 100MB?",
+      "sourceRepo": "Community",
+      "pluginName": "checkFileSize",
+      "version": "1.0.0",
+      "id": "C5tbUCt6p",
+      "position": {
+        "x": 564,
+        "y": -408
+      },
+      "fpEnabled": true,
+      "inputsDB": {
+        "unit": "MB",
+        "lessThan": "100"
+      }
+    }
+  ],
+  "flowEdges": [
+    {
+      "source": "M_mrP-J_d",
+      "sourceHandle": "1",
+      "target": "7yXBj4-aC",
+      "targetHandle": null,
+      "id": "edge2",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "M_mrP-J_d",
+      "sourceHandle": "2",
+      "target": "7yXBj4-aC",
+      "targetHandle": null,
+      "id": "edge3",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "3AOkEqifp",
+      "sourceHandle": "1",
+      "target": "aQKzSWY-r",
+      "targetHandle": null,
+      "id": "edge5",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "JBA2N2W7L",
+      "sourceHandle": "1",
+      "target": "aQKzSWY-r",
+      "targetHandle": null,
+      "id": "edge14",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "JBA2N2W7L",
+      "sourceHandle": "2",
+      "target": "aQKzSWY-r",
+      "targetHandle": null,
+      "id": "edge15",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "JBA2N2W7L",
+      "sourceHandle": "3",
+      "target": "ksKmTCZB0",
+      "targetHandle": null,
+      "id": "edge16",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "ksKmTCZB0",
+      "sourceHandle": "1",
+      "target": "aQKzSWY-r",
+      "targetHandle": null,
+      "id": "edge17",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "aQKzSWY-r",
+      "sourceHandle": "1",
+      "target": "ZvfzKZ6Nw",
+      "targetHandle": null,
+      "id": "edge18",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "aQKzSWY-r",
+      "sourceHandle": "2",
+      "target": "ZvfzKZ6Nw",
+      "targetHandle": null,
+      "id": "edge19",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "ZvfzKZ6Nw",
+      "sourceHandle": "1",
+      "target": "XLXwY90TH",
+      "targetHandle": null,
+      "id": "edge20",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "ZvfzKZ6Nw",
+      "sourceHandle": "2",
+      "target": "XLXwY90TH",
+      "targetHandle": null,
+      "id": "edge21",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "aRB7_yBQE",
+      "sourceHandle": "1",
+      "target": "JBA2N2W7L",
+      "targetHandle": null,
+      "id": "bWVT2NLZV",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "aRB7_yBQE",
+      "sourceHandle": "2",
+      "target": "JBA2N2W7L",
+      "targetHandle": null,
+      "id": "bMpfM6Shn",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "L5oZNsSMG",
+      "sourceHandle": "1",
+      "target": "JBA2N2W7L",
+      "targetHandle": null,
+      "id": "v9FWZT2Js",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "L5oZNsSMG",
+      "sourceHandle": "2",
+      "target": "JBA2N2W7L",
+      "targetHandle": null,
+      "id": "QVdsrUnkB",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "TOqGPovz0",
+      "sourceHandle": "1",
+      "target": "yXW_0oE2B",
+      "targetHandle": null,
+      "id": "wmHT3kCB6",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "TOqGPovz0",
+      "sourceHandle": "err1",
+      "target": "7ralhn4Ji",
+      "targetHandle": null,
+      "id": "BwX7-gQDW",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "yXW_0oE2B",
+      "sourceHandle": "err1",
+      "target": "7ralhn4Ji",
+      "targetHandle": null,
+      "id": "mQtZIVlli",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "wNsKwyZEu",
+      "sourceHandle": "1",
+      "target": "aRB7_yBQE",
+      "targetHandle": null,
+      "id": "ukHpWxtsh",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "9m5iVBMU3",
+      "sourceHandle": "1",
+      "target": "L5oZNsSMG",
+      "targetHandle": null,
+      "id": "BBFN7JR59",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "9m5iVBMU3",
+      "sourceHandle": "2",
+      "target": "L5oZNsSMG",
+      "targetHandle": null,
+      "id": "rZNd8_UQV",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "3AOkEqifp",
+      "sourceHandle": "2",
+      "target": "wNsKwyZEu",
+      "targetHandle": null,
+      "id": "7wBG7k4Lh",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "wNsKwyZEu",
+      "sourceHandle": "2",
+      "target": "9m5iVBMU3",
+      "targetHandle": null,
+      "id": "z3kXx_PFQ",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "XiP0F7Njs",
+      "sourceHandle": "1",
+      "target": "TOqGPovz0",
+      "targetHandle": null,
+      "id": "8OtZY04_C",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "M_mrP-J_d",
+      "sourceHandle": "err1",
+      "target": "XiP0F7Njs",
+      "targetHandle": null,
+      "id": "X6boKnrkx",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "7yXBj4-aC",
+      "sourceHandle": "err1",
+      "target": "XiP0F7Njs",
+      "targetHandle": null,
+      "id": "LCG623d-i",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "7yXBj4-aC",
+      "sourceHandle": "1",
+      "target": "C5tbUCt6p",
+      "targetHandle": null,
+      "id": "eitpIm3YO",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "yXW_0oE2B",
+      "sourceHandle": "1",
+      "target": "C5tbUCt6p",
+      "targetHandle": null,
+      "id": "NbRLAjqSf",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "7ralhn4Ji",
+      "sourceHandle": "1",
+      "target": "C5tbUCt6p",
+      "targetHandle": null,
+      "id": "f9Ts5nvuj",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "C5tbUCt6p",
+      "sourceHandle": "2",
+      "target": "3AOkEqifp",
+      "targetHandle": null,
+      "id": "O6Up2fEXG",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "C5tbUCt6p",
+      "sourceHandle": "1",
+      "target": "aQKzSWY-r",
+      "targetHandle": null,
+      "id": "7-7I5iEjn",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "_YTuyCZg3",
+      "sourceHandle": "1",
+      "target": "M_mrP-J_d",
+      "targetHandle": null,
+      "id": "Xuczobv0P",
+      "animated": true,
+      "type": "smoothstep"
+    }
+  ],
+  "isUiLocked": false
+}

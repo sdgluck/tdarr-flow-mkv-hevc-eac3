@@ -1,0 +1,20 @@
+{
+  "name": "tdarr-config",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "test:findings": "vitest run --config vitest.findings.config.ts",
+    "typecheck": "tsc --noEmit",
+    "lint:flow": "tdarr-test lint flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --ignore missing-error-edge:audProped",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
+    "tdarr-flow-test": "link:../tdarr-test",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

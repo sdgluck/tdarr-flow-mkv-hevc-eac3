@@ -76,7 +76,10 @@ Audio is left alone wherever it already direct-plays.
 which no-ops when the file is already MKV. On failure the flow falls through
 `Reset Flow Error` → `Force Remux` (`ForceRemuxMKV`), which rebuilds the
 container unconditionally — the healing path for files with broken indexes.
-Either way it lands on `Run MKVPropEdit`, which writes track statistics tags.
+`Run MKVPropEdit` then writes track statistics tags, but **only on the branch
+where the remux actually processed the file**. `--add-track-statistics-tags`
+reads the whole file, so running it on an untouched file is pure I/O for no
+gain — at ~19,600 files that adds up on every scan.
 
 **2. Size gate.** `File <= 100MB?` sends tiny files straight to the audio and
 subtitle cleanup, skipping video transcode entirely — not worth the GPU time.
@@ -125,17 +128,25 @@ streams, then:
   `-c copy`, so video and subtitles are remuxed, never re-encoded. If nothing
   changed, it skips ffmpeg entirely.
 
-**6. Finalise.** A second `Run MKVPropEdit` re-stamps statistics tags so the new
-audio track reports its real bitrate and size, then `Replace Original File`
-swaps the cache file over the original. Its `err1` output also goes to Replace —
-a tagging failure shouldn't discard a good transcode.
+**6. Finalise.** `Unchanged?` tests `ffmpegCommand.shouldProcess`; if the command
+did nothing, the flow goes straight to `Replace Original File` (which then also
+does nothing, since the file is byte-identical). Otherwise a second
+`Run MKVPropEdit` re-stamps statistics tags so the new audio track reports its
+real bitrate and size. Its `err1` output also goes to Replace — a tagging
+failure shouldn't discard a good transcode.
+
+The check is deliberately phrased as *Unchanged?* (`== false`) rather than
+*Changed?*: if the template ever fails to resolve, the empty value won't match,
+so the flow falls through to restamping. Wrong-but-safe beats silently skipping
+stats after a real change.
 
 ## Graph
 
 ```mermaid
 flowchart TD
     IN[Input File] --> REMUX[Remux & Heal Container]
-    REMUX -->|ok| PROP1[Run MKVPropEdit]
+    REMUX -->|processed| PROP1[Run MKVPropEdit]
+    REMUX -->|no change| SIZE
     REMUX -.->|err| RST1[Reset Flow Error]
     RST1 --> FORCE[Force Remux]
     FORCE --> PROP2[Run MKVPropEdit]
@@ -174,8 +185,10 @@ flowchart TD
     DROP --> KEEP[Keep One Audio Stream]
     KEEP --> ORDER[Reorder Streams]
     ORDER --> EXEC[Execute]
-    EXEC --> PROP3[Run MKVPropEdit]
-    PROP3 --> REPL[Replace Original File]
+    EXEC --> CHG{Unchanged?}
+    CHG -->|yes| REPL[Replace Original File]
+    CHG -->|no| PROP3[Run MKVPropEdit]
+    PROP3 --> REPL
 
     subgraph audio [Audio ffmpeg command block]
         START
@@ -207,3 +220,7 @@ flowchart TD
   transcodes server-side — a performance cost, not a broken file.
 - **AV1 sources are transcoded to HEVC**, which is backwards efficiency-wise.
   One show in the library is affected.
+- **A file with no English audio keeps its foreign track.** `CleanAudio` refuses
+  to strip the last audio stream, and `keepOneAudioStream` then keeps whatever
+  survived. Better than a silent file, but "one English track" is not guaranteed
+  library-wide.

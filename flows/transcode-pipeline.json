@@ -333,6 +333,23 @@
       }
     },
     {
+      "name": "Unchanged?",
+      "sourceRepo": "Community",
+      "pluginName": "checkFlowVariable",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "audChgChk",
+      "position": {
+        "x": 624,
+        "y": 888
+      },
+      "inputsDB": {
+        "variable": "{{{args.variables.ffmpegCommand.shouldProcess}}}",
+        "condition": "==",
+        "value": "false"
+      }
+    },
+    {
       "name": "Run MKVPropEdit",
       "sourceRepo": "Community",
       "pluginName": "runMkvPropEdit",
@@ -340,7 +357,7 @@
       "fpEnabled": true,
       "id": "audProped",
       "position": {
-        "x": 624,
+        "x": 420,
         "y": 960
       }
     },
@@ -445,7 +462,7 @@
     {
       "source": "M_mrP-J_d",
       "sourceHandle": "2",
-      "target": "7yXBj4-aC",
+      "target": "C5tbUCt6p",
       "targetHandle": null,
       "id": "edge3",
       "animated": true,
@@ -722,15 +739,6 @@
       "type": "smoothstep"
     },
     {
-      "source": "audExec001",
-      "sourceHandle": "1",
-      "target": "audProped",
-      "targetHandle": null,
-      "id": "aud-e6",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
       "source": "audProped",
       "sourceHandle": "1",
       "target": "XLXwY90TH",
@@ -862,6 +870,33 @@
       "target": "audReorder",
       "targetHandle": null,
       "id": "aud-e26",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audExec001",
+      "sourceHandle": "1",
+      "target": "audChgChk",
+      "targetHandle": null,
+      "id": "aud-e6",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audChgChk",
+      "sourceHandle": "1",
+      "target": "XLXwY90TH",
+      "targetHandle": null,
+      "id": "aud-e27",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audChgChk",
+      "sourceHandle": "2",
+      "target": "audProped",
+      "targetHandle": null,
+      "id": "aud-e28",
       "animated": true,
       "type": "smoothstep"
     }

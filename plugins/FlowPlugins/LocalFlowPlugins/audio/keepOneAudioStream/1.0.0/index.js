@@ -63,8 +63,8 @@ var isBetter = function (candidate, incumbent) {
 };
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 var plugin = function (args) {
-    var flowUtils_1 = require('../../../FlowHelpers/1.0.0/interfaces/flowUtils');
-    var lib = require('../../../../methods/lib')();
+    var flowUtils_1 = require('../../../../FlowHelpers/1.0.0/interfaces/flowUtils');
+    var lib = require('../../../../../methods/lib')();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars,no-param-reassign
     args.inputs = lib.loadDefaultValues(args.inputs, details);
     (0, flowUtils_1.checkFfmpegCommandInit)(args);

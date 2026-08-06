@@ -36,20 +36,29 @@ export strips. `flows/transcode-pipeline.json` is in DB shape and imports fine.
 These are real source files. On the server they live under:
 
 - Classic plugins: `/app/server/Tdarr/Plugins/Local/*.js`
-- Flow plugins: `/app/server/Tdarr/Plugins/FlowPlugins/LocalFlowPlugins/<name>/<version>/index.js`
+- Flow plugins: `/app/server/Tdarr/Plugins/FlowPlugins/LocalFlowPlugins/<category>/<name>/<version>/index.js`
 
-Copy them in preserving that structure. Note local flow plugins have **no
-category directory**, unlike `CommunityFlowPlugins/<category>/<name>/<version>/`
-— they sit directly under `LocalFlowPlugins/`. That makes them one level
-shallower, so their relative `require`s differ from the community ones:
-`../../../FlowHelpers/...` and `../../../../methods/lib`. Getting this wrong
-fails at runtime with `Plugin does not exist: .../LocalFlowPlugins///<name>/...`
-— the empty path segments in that message are the giveaway.
+Copy them in preserving that structure — local flow plugins use the same
+`<category>/<name>/<version>/` layout as `CommunityFlowPlugins`, so the relative
+`require`s are identical: `../../../../FlowHelpers/...` and
+`../../../../../methods/lib`.
 
-Plugins are resolved on the **node**, at
-`/app/Tdarr_Node/assets/app/plugins/...`, not on the server. Nodes sync their
-copy from the server, so a newly added local plugin may need a node restart
-before it is visible.
+Two different consumers resolve these paths, and they fail differently:
+
+- The **server** scans for plugins to populate the editor sidebar. Wrong depth
+  shows up in the server log as
+  `Cannot find module .../<name>/<version>/index.js/index.js` — it walked three
+  levels, ran out, and appended `index.js` to a file.
+- The **node** loads the plugin to run it, from
+  `/app/Tdarr_Node/assets/app/plugins/...`, not from the server directory. Nodes
+  sync their copy from the server, so a newly added local plugin needs a node
+  restart before it can run.
+
+A node-side error like
+`Plugin does not exist: .../LocalFlowPlugins///<name>/<version>/index.js`
+means the **flow node JSON is missing fields**, not that the directory is wrong
+— the empty segments are unpopulated category values. Add the node from the
+editor sidebar rather than hand-writing it into the flow JSON.
 
 Flow plugins are loaded as compiled JavaScript, so the files here are plain JS
 written in the same CommonJS shape the community plugins compile to. Local flow

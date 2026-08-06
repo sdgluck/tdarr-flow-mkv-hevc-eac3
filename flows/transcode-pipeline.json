@@ -182,57 +182,57 @@
       }
     },
     {
-      "name": "Ensure AC3 (Stereo)",
+      "name": "Ensure AC3 384k",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandEnsureAudioStream",
       "version": "1.0.0",
       "fpEnabled": true,
       "id": "audEnsure1",
       "position": {
-        "x": 444,
-        "y": 528
+        "x": 624,
+        "y": 384
       },
       "inputsDB": {
         "audioEncoder": "ac3",
         "language": "eng",
         "channels": "6",
         "enableBitrate": "true",
-        "bitrate": "256k",
+        "bitrate": "384k",
         "enableSamplerate": "false",
         "samplerate": "48k"
       }
     },
     {
-      "name": "Audio <= 256kbps?",
+      "name": "Audio <= 384kbps?",
       "sourceRepo": "Community",
       "pluginName": "checkAudioBitrate",
       "version": "1.0.0",
       "fpEnabled": true,
       "id": "audBrChk",
       "position": {
-        "x": 444,
-        "y": 600
+        "x": 624,
+        "y": 456
       },
       "inputsDB": {
         "unit": "kbps",
         "greaterThan": "0",
-        "lessThan": "256"
+        "lessThan": "384"
       }
     },
     {
-      "name": "Force AC3 256k",
+      "name": "Force AC3 384k",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandCustomArguments",
       "version": "1.0.0",
       "fpEnabled": true,
       "id": "audCustom",
       "position": {
-        "x": 264,
-        "y": 672
+        "x": 420,
+        "y": 528
       },
       "inputsDB": {
         "inputArguments": "",
-        "outputArguments": "-c:a ac3 -b:a 256k"
+        "outputArguments": "-c:a ac3 -b:a 384k"
       }
     },
     {
@@ -244,7 +244,7 @@
       "id": "audStrip01",
       "position": {
         "x": 624,
-        "y": 744
+        "y": 600
       },
       "inputsDB": {
         "codecType": "audio",
@@ -262,58 +262,7 @@
       "id": "audExec001",
       "position": {
         "x": 624,
-        "y": 888
-      }
-    },
-    {
-      "name": "Has 7.1 Audio?",
-      "sourceRepo": "Community",
-      "pluginName": "checkChannelCount",
-      "version": "1.0.0",
-      "fpEnabled": true,
-      "id": "audChk8",
-      "position": {
-        "x": 624,
-        "y": 384
-      },
-      "inputsDB": {
-        "channelCount": "8"
-      }
-    },
-    {
-      "name": "Has 5.1 Audio?",
-      "sourceRepo": "Community",
-      "pluginName": "checkChannelCount",
-      "version": "1.0.0",
-      "fpEnabled": true,
-      "id": "audChk6",
-      "position": {
-        "x": 624,
-        "y": 456
-      },
-      "inputsDB": {
-        "channelCount": "6"
-      }
-    },
-    {
-      "name": "Ensure AC3 (Surround)",
-      "sourceRepo": "Community",
-      "pluginName": "ffmpegCommandEnsureAudioStream",
-      "version": "1.0.0",
-      "fpEnabled": true,
-      "id": "audEnsureS",
-      "position": {
-        "x": 804,
-        "y": 528
-      },
-      "inputsDB": {
-        "audioEncoder": "ac3",
-        "language": "eng",
-        "channels": "6",
-        "enableBitrate": "true",
-        "bitrate": "640k",
-        "enableSamplerate": "false",
-        "samplerate": "48k"
+        "y": 744
       }
     },
     {
@@ -325,7 +274,7 @@
       "id": "audReorder",
       "position": {
         "x": 624,
-        "y": 816
+        "y": 672
       },
       "inputsDB": {
         "processOrder": "codecs,channels,languages,streamTypes",
@@ -344,7 +293,7 @@
       "id": "audProped",
       "position": {
         "x": 624,
-        "y": 960
+        "y": 816
       }
     },
     {
@@ -356,7 +305,7 @@
       "id": "XLXwY90TH",
       "position": {
         "x": 624,
-        "y": 1032
+        "y": 888
       }
     },
     {
@@ -725,60 +674,6 @@
       "type": "smoothstep"
     },
     {
-      "source": "audStart01",
-      "sourceHandle": "1",
-      "target": "audChk8",
-      "targetHandle": null,
-      "id": "aud-e3",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audChk8",
-      "sourceHandle": "1",
-      "target": "audEnsureS",
-      "targetHandle": null,
-      "id": "aud-e7",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audChk8",
-      "sourceHandle": "2",
-      "target": "audChk6",
-      "targetHandle": null,
-      "id": "aud-e8",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audChk6",
-      "sourceHandle": "1",
-      "target": "audEnsureS",
-      "targetHandle": null,
-      "id": "aud-e9",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audChk6",
-      "sourceHandle": "2",
-      "target": "audEnsure1",
-      "targetHandle": null,
-      "id": "aud-e10",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audEnsureS",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "aud-e11",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
       "source": "audStrip01",
       "sourceHandle": "1",
       "target": "audReorder",
@@ -865,6 +760,15 @@
       "target": "audStrip01",
       "targetHandle": null,
       "id": "aud-e18",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audStart01",
+      "sourceHandle": "1",
+      "target": "audEnsure1",
+      "targetHandle": null,
+      "id": "aud-e3",
       "animated": true,
       "type": "smoothstep"
     }

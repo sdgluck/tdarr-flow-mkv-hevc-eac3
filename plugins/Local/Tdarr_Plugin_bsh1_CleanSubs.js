@@ -60,8 +60,10 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   subtitleStreams.forEach(stream => {
     const lang = (stream.tags?.language || '').toLowerCase();
     const title = (stream.tags?.title || '').toLowerCase();
-    const isHearingImpaired = stream.disposition?.hearing_impaired === 1;
-    const isCommentary = title.includes('comment') || title.includes('sdh') && !isHearingImpaired;
+    // SDH is signalled either by the disposition flag or by the title alone;
+    // it is deliberately NOT treated as commentary, so remove_sdh governs it.
+    const isSDH = stream.disposition?.hearing_impaired === 1 || title.includes('sdh');
+    const isCommentary = stream.disposition?.comment === 1 || title.includes('comment');
 
     let shouldRemove = false;
 
@@ -71,7 +73,7 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     } else if (removeCommentary && isCommentary) {
       shouldRemove = true;
       response.infoLog += `☒ Removing commentary subtitle stream ${stream.index}.\n`;
-    } else if (removeSDH && isHearingImpaired) {
+    } else if (removeSDH && isSDH) {
       shouldRemove = true;
       response.infoLog += `☒ Removing SDH subtitle stream ${stream.index}.\n`;
     }

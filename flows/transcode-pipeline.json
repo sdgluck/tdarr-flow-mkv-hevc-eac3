@@ -429,22 +429,6 @@
       }
     },
     {
-      "name": "File <= 100MB?",
-      "sourceRepo": "Community",
-      "pluginName": "checkFileSize",
-      "version": "1.0.0",
-      "inputsDB": {
-        "unit": "MB",
-        "lessThan": "100"
-      },
-      "fpEnabled": true,
-      "id": "C5tbUCt6p",
-      "position": {
-        "x": 564,
-        "y": -408
-      }
-    },
-    {
       "id": "gateMkv1",
       "name": "Is MKV?",
       "sourceRepo": "Community",
@@ -619,7 +603,7 @@
     {
       "source": "M_mrP-J_d",
       "sourceHandle": "2",
-      "target": "C5tbUCt6p",
+      "target": "3AOkEqifp",
       "targetHandle": null,
       "id": "edge3"
     },
@@ -787,37 +771,23 @@
     {
       "source": "7yXBj4-aC",
       "sourceHandle": "1",
-      "target": "C5tbUCt6p",
+      "target": "3AOkEqifp",
       "targetHandle": null,
       "id": "eitpIm3YO"
     },
     {
       "source": "yXW_0oE2B",
       "sourceHandle": "1",
-      "target": "C5tbUCt6p",
+      "target": "3AOkEqifp",
       "targetHandle": null,
       "id": "NbRLAjqSf"
     },
     {
       "source": "7ralhn4Ji",
       "sourceHandle": "1",
-      "target": "C5tbUCt6p",
-      "targetHandle": null,
-      "id": "f9Ts5nvuj"
-    },
-    {
-      "source": "C5tbUCt6p",
-      "sourceHandle": "2",
       "target": "3AOkEqifp",
       "targetHandle": null,
-      "id": "O6Up2fEXG"
-    },
-    {
-      "source": "C5tbUCt6p",
-      "sourceHandle": "1",
-      "target": "aQKzSWY-r",
-      "targetHandle": null,
-      "id": "7-7I5iEjn"
+      "id": "f9Ts5nvuj"
     },
     {
       "source": "_YTuyCZg3",
@@ -964,7 +934,7 @@
     {
       "source": "gateMkv1",
       "sourceHandle": "2",
-      "target": "C5tbUCt6p",
+      "target": "3AOkEqifp",
       "targetHandle": null,
       "id": "reactflow__edge-gateMkv12-C5tbUCt6pnull",
       "animated": true,
@@ -982,7 +952,7 @@
     {
       "source": "gateMkv2",
       "sourceHandle": "2",
-      "target": "C5tbUCt6p",
+      "target": "3AOkEqifp",
       "targetHandle": null,
       "id": "reactflow__edge-gateMkv22-C5tbUCt6pnull",
       "animated": true,

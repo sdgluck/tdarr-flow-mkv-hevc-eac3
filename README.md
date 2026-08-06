@@ -100,22 +100,27 @@ one test file, 7 KB and 0.5 s instead of 91 MB and 13 minutes. ffmpeg still
 exits non-zero, so the flow takes the error branch, but the failure is silent
 in the sense that nothing downstream knows the container never converted.
 
-**`Force Remux` only handles MKV → MKV.** It is a container *repair* tool for
-files that fail stats tagging, not a general fallback, and it declines anything
-that is not already Matroska. So the error branch does not heal a failed
-container *conversion* — see Known wrinkles.
+`Force Remux` (`ForceRemuxMKV`) is the escalation, and it accepts **any**
+container. It used to decline anything that was not already Matroska, which
+made it a no-op in exactly the case that needed healing: a failed container
+conversion carried on in its original container with nothing having repaired
+it. That is how one `.avi` reached the audio block still as AVI.
 
-**2. Size gate.** `File <= 100MB?` sends tiny files straight to the audio and
-subtitle cleanup, skipping video transcode entirely — not worth the GPU time.
+It also has to be more permissive than attempt 1, or it just re-runs the same
+command and fails identically — the two presets used to be byte-identical. It
+now adds `+igndts`, much larger `analyzeduration`/`probesize`, `-err_detect
+ignore_err` and `-avoid_negative_ts make_zero` on top of `+genpts`. Still a
+pure stream copy, so nothing is re-encoded and nothing is lost. On an MKV input
+it keeps its original job of rewriting a structurally broken container.
 
-**3. Video.** `Is HEVC?` skips anything already HEVC. Otherwise the flow picks
+**2. Video.** `Is HEVC?` skips anything already HEVC. Otherwise the flow picks
 an encoder by node name: `Nvidia?` routes to NVENC (`Migz1FFMPEG`), `Intel?` to
 QuickSync (`Boosh_FFMPEG_QSV_HEVC`), and anything else falls back to a CPU
 encode (`Migz1FFMPEG_CPU`) rather than being handed the wrong GPU path.
 `Compare File Size Ratio` then guards the result — if the new file isn't
 smaller, `Set Original File` discards it and the original is kept.
 
-**4. Language cleanup.** `Remove Non English Audio` and `Remove Non English Subs`
+**3. Language cleanup.** `Remove Non English Audio` and `Remove Non English Subs`
 (local `CleanAudio` / `CleanSubs`) strip non-English tracks and commentary. SDH
 subtitles are kept, because `remove_sdh` is `false`.
 
@@ -127,7 +132,7 @@ commentary test, so `remove_commentary: true` silently deleted SDH tracks and
 `remove_sdh` was never consulted. Most releases label SDH in the title without
 setting the disposition flag, so that path was the one that actually fired.
 
-**5. Audio.** An ffmpeg-command block that plans one command and executes it
+**4. Audio.** An ffmpeg-command block that plans one command and executes it
 once. The policy is **pass-through**: leave audio alone if it already
 direct-plays, and only convert what doesn't. `Begin Command` snapshots the
 streams and `Force MKV Container` pins the output container, then:
@@ -186,7 +191,7 @@ container conversion when the earlier remux could not do it.
   `-c copy`, so video and subtitles are remuxed, never re-encoded. If nothing
   changed, it skips ffmpeg entirely.
 
-**6. Finalise.** `File Changed?` (stock `checkFileChanged`) compares the working
+**5. Finalise.** `File Changed?` (stock `checkFileChanged`) compares the working
 file against the original library file — by path *and* by size. If either
 differs, something upstream rewrote the file, so `Run MKVPropEdit` re-stamps
 statistics tags before `Replace Original File`. If nothing changed, the flow
@@ -224,18 +229,17 @@ each costs a full file read.
 flowchart TD
     IN[Input File] --> REMUX[Remux & Heal Container]
     REMUX -->|processed| PROP1[Run MKVPropEdit]
-    REMUX -->|no change| SIZE
+    REMUX -->|no change| HEVC
     REMUX -.->|err| RST1[Reset Flow Error]
     RST1 --> FORCE[Force Remux]
     FORCE --> PROP2[Run MKVPropEdit]
     FORCE -.->|err| RST2[Reset Flow Error]
     PROP2 -.->|err| RST2
-    RST2 --> SIZE
-    PROP1 --> SIZE{File &lt;= 100MB?}
-    PROP2 --> SIZE
+    RST2 --> HEVC
+    PROP1 --> HEVC
+    PROP2 --> HEVC
 
-    SIZE -->|yes| CLEANA
-    SIZE -->|no| HEVC{Is HEVC?}
+    HEVC{Is HEVC?}
     HEVC -->|yes| CLEANA
     HEVC -->|no| NV{Nvidia?}
     NV -->|yes| ENC1[Transcode HEVC NVENC]
@@ -308,20 +312,17 @@ flowchart TD
   transcodes server-side — a performance cost, not a broken file.
 - **AV1 sources are transcoded to HEVC**, which is backwards efficiency-wise.
   One show in the library is affected.
-- **`Force Remux` cannot heal a failed container conversion.** It only accepts
-  MKV input, so when `RemuxMKV` fails on a non-MKV file the error branch is a
-  no-op and the file continues in its original container. The `genpts` fix
-  removes the common cause, but the gap remains for any other remux failure.
-  A general fallback would need a separate plugin that force-remuxes *to* MKV
-  from any container.
+- **Nothing escalates past `Force Remux`.** If the permissive second attempt
+  also fails, the file continues in its original container. That is now safe
+  rather than silent — the failed run cannot overwrite the library file, and
+  the audio block's `Force MKV Container` will still emit MKV if it has any
+  reason to run — but a file whose remux fails *and* whose audio needs no
+  change is left untouched in its original container.
 - **The tiers are keyed on channel count, not source bitrate.** A 5.1 track
   that arrived at 192k is still re-encoded at 384k. Channel count is the better
   proxy in practice — bitrate on the incoming stream is often absent or wrong
   in the container metadata — but a genuinely low-bitrate surround source will
   still grow.
-- **The 100 MB size gate skips video transcode for SD content**, so old
-  `mpeg4`/DivX files keep their original codec however outdated. Deliberate,
-  but it means the `.avi` set is never modernised beyond container and audio.
 - **A file with no English audio keeps its foreign track.** `CleanAudio` refuses
   to strip the last audio stream, and `keepOneAudioStream` then keeps whatever
   survived. Better than a silent file, but "one English track" is not guaranteed

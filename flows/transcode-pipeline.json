@@ -333,15 +333,11 @@
       }
     },
     {
-      "name": "Unchanged?",
+      "name": "File Changed?",
       "sourceRepo": "Community",
-      "pluginName": "checkFlowVariable",
+      "pluginName": "checkFileChanged",
       "version": "1.0.0",
-      "inputsDB": {
-        "variable": "{{{args.variables.ffmpegCommand.shouldProcess}}}",
-        "condition": "==",
-        "value": "false"
-      },
+      "inputsDB": {},
       "fpEnabled": true,
       "id": "audChgChk",
       "position": {
@@ -447,13 +443,176 @@
         "x": 564,
         "y": -408
       }
+    },
+    {
+      "id": "gateMkv1",
+      "name": "Is MKV?",
+      "sourceRepo": "Community",
+      "pluginName": "checkFileExtension",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "extensions": "mkv"
+      },
+      "position": {
+        "x": 1180,
+        "y": 300
+      }
+    },
+    {
+      "id": "gateMkv2",
+      "name": "Is MKV?",
+      "sourceRepo": "Community",
+      "pluginName": "checkFileExtension",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "extensions": "mkv"
+      },
+      "position": {
+        "x": 1180,
+        "y": 560
+      }
+    },
+    {
+      "id": "gateMkv3",
+      "name": "Is MKV?",
+      "sourceRepo": "Community",
+      "pluginName": "checkFileExtension",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "extensions": "mkv"
+      },
+      "position": {
+        "x": 624,
+        "y": 1010
+      }
+    },
+    {
+      "id": "audSetCont",
+      "name": "Force MKV Container",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandSetContainer",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "container": "mkv",
+        "forceConform": "false"
+      },
+      "position": {
+        "x": 624,
+        "y": 300
+      }
+    },
+    {
+      "id": "audEns192",
+      "name": "Ensure EAC3 192k",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandEnsureAudioStream",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "audioEncoder": "eac3",
+        "language": "eng",
+        "channels": "6",
+        "enableBitrate": "true",
+        "bitrate": "192k",
+        "enableSamplerate": "false",
+        "samplerate": "48k"
+      },
+      "position": {
+        "x": 980,
+        "y": 560
+      }
+    },
+    {
+      "id": "audEns96",
+      "name": "Ensure EAC3 96k",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandEnsureAudioStream",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "audioEncoder": "eac3",
+        "language": "eng",
+        "channels": "6",
+        "enableBitrate": "true",
+        "bitrate": "96k",
+        "enableSamplerate": "false",
+        "samplerate": "48k"
+      },
+      "position": {
+        "x": 980,
+        "y": 700
+      }
+    },
+    {
+      "id": "audCh6",
+      "name": "6ch?",
+      "sourceRepo": "Community",
+      "pluginName": "checkChannelCount",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "channelCount": "6"
+      },
+      "position": {
+        "x": 300,
+        "y": 420
+      }
+    },
+    {
+      "id": "audCh8",
+      "name": "8ch?",
+      "sourceRepo": "Community",
+      "pluginName": "checkChannelCount",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "channelCount": "8"
+      },
+      "position": {
+        "x": 300,
+        "y": 560
+      }
+    },
+    {
+      "id": "audCh2",
+      "name": "2ch?",
+      "sourceRepo": "Community",
+      "pluginName": "checkChannelCount",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "channelCount": "2"
+      },
+      "position": {
+        "x": 300,
+        "y": 700
+      }
+    },
+    {
+      "id": "audCh1",
+      "name": "1ch?",
+      "sourceRepo": "Community",
+      "pluginName": "checkChannelCount",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "inputsDB": {
+        "channelCount": "1"
+      },
+      "position": {
+        "x": 300,
+        "y": 840
+      }
     }
   ],
   "flowEdges": [
     {
       "source": "M_mrP-J_d",
       "sourceHandle": "1",
-      "target": "7yXBj4-aC",
+      "target": "gateMkv2",
       "targetHandle": null,
       "id": "edge2"
     },
@@ -558,7 +717,7 @@
     {
       "source": "TOqGPovz0",
       "sourceHandle": "1",
-      "target": "yXW_0oE2B",
+      "target": "gateMkv1",
       "targetHandle": null,
       "id": "wmHT3kCB6"
     },
@@ -682,13 +841,6 @@
       "id": "aud-e13"
     },
     {
-      "source": "audProped",
-      "sourceHandle": "err1",
-      "target": "XLXwY90TH",
-      "targetHandle": null,
-      "id": "aud-e14"
-    },
-    {
       "source": "9m5iVBMU3",
       "sourceHandle": "2",
       "target": "audCpuEnc",
@@ -710,7 +862,7 @@
       "id": "cpu-e3"
     },
     {
-      "source": "audStart01",
+      "source": "audSetCont",
       "sourceHandle": "1",
       "target": "audChkEac",
       "targetHandle": null,
@@ -754,7 +906,7 @@
     {
       "source": "audChkAac",
       "sourceHandle": "2",
-      "target": "audEnsure1",
+      "target": "audCh6",
       "targetHandle": null,
       "id": "aud-e25"
     },
@@ -788,17 +940,170 @@
     },
     {
       "source": "audChgChk",
-      "sourceHandle": "1",
+      "sourceHandle": "2",
       "target": "XLXwY90TH",
       "targetHandle": null,
       "id": "aud-e27"
     },
     {
       "source": "audChgChk",
-      "sourceHandle": "2",
-      "target": "audProped",
+      "sourceHandle": "1",
+      "target": "gateMkv3",
       "targetHandle": null,
       "id": "aud-e28"
+    },
+    {
+      "source": "gateMkv1",
+      "sourceHandle": "1",
+      "target": "yXW_0oE2B",
+      "targetHandle": null,
+      "id": "reactflow__edge-gateMkv11-yXW_0oE2Bnull",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "gateMkv1",
+      "sourceHandle": "2",
+      "target": "C5tbUCt6p",
+      "targetHandle": null,
+      "id": "reactflow__edge-gateMkv12-C5tbUCt6pnull",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "gateMkv2",
+      "sourceHandle": "1",
+      "target": "7yXBj4-aC",
+      "targetHandle": null,
+      "id": "reactflow__edge-gateMkv21-7yXBj4-aCnull",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "gateMkv2",
+      "sourceHandle": "2",
+      "target": "C5tbUCt6p",
+      "targetHandle": null,
+      "id": "reactflow__edge-gateMkv22-C5tbUCt6pnull",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "gateMkv3",
+      "sourceHandle": "1",
+      "target": "audProped",
+      "targetHandle": null,
+      "id": "reactflow__edge-gateMkv31-audPropednull",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "gateMkv3",
+      "sourceHandle": "2",
+      "target": "XLXwY90TH",
+      "targetHandle": null,
+      "id": "reactflow__edge-gateMkv32-XLXwY90THnull",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audStart01",
+      "sourceHandle": "1",
+      "target": "audSetCont",
+      "targetHandle": null,
+      "id": "reactflow__edge-audStart011-audSetContnull",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCh6",
+      "sourceHandle": "1",
+      "target": "audEnsure1",
+      "targetHandle": null,
+      "id": "reactflow__edge-audCh61-audEnsure1null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCh6",
+      "sourceHandle": "2",
+      "target": "audCh8",
+      "targetHandle": null,
+      "id": "reactflow__edge-audCh62-audCh8null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCh8",
+      "sourceHandle": "1",
+      "target": "audEnsure1",
+      "targetHandle": null,
+      "id": "reactflow__edge-audCh81-audEnsure1null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCh8",
+      "sourceHandle": "2",
+      "target": "audCh2",
+      "targetHandle": null,
+      "id": "reactflow__edge-audCh82-audCh2null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCh2",
+      "sourceHandle": "1",
+      "target": "audEns192",
+      "targetHandle": null,
+      "id": "reactflow__edge-audCh21-audEns192null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCh2",
+      "sourceHandle": "2",
+      "target": "audCh1",
+      "targetHandle": null,
+      "id": "reactflow__edge-audCh22-audCh1null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCh1",
+      "sourceHandle": "1",
+      "target": "audEns96",
+      "targetHandle": null,
+      "id": "reactflow__edge-audCh11-audEns96null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audCh1",
+      "sourceHandle": "2",
+      "target": "audEnsure1",
+      "targetHandle": null,
+      "id": "reactflow__edge-audCh12-audEnsure1null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audEns192",
+      "sourceHandle": "1",
+      "target": "audStrip01",
+      "targetHandle": null,
+      "id": "reactflow__edge-audEns1921-audStrip01null",
+      "animated": true,
+      "type": "smoothstep"
+    },
+    {
+      "source": "audEns96",
+      "sourceHandle": "1",
+      "target": "audStrip01",
+      "targetHandle": null,
+      "id": "reactflow__edge-audEns961-audStrip01null",
+      "animated": true,
+      "type": "smoothstep"
     }
   ],
   "isUiLocked": false

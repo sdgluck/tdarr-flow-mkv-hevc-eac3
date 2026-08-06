@@ -91,12 +91,19 @@ Audio is left alone wherever it already direct-plays.
 
 **1. Container.** `Remux & Heal Container` runs the local `RemuxMKV` plugin,
 which no-ops when the file is already MKV. On failure the flow falls through
-`Reset Flow Error` → `Force Remux` (`ForceRemuxMKV`), which rebuilds the
-container unconditionally — the healing path for files with broken indexes.
-`Run MKVPropEdit` then writes track statistics tags, but **only on the branch
-where the remux actually processed the file**. `--add-track-statistics-tags`
-reads the whole file, so running it on an untouched file is pure I/O for no
-gain — at ~19,600 files that adds up on every scan.
+`Reset Flow Error` → `Force Remux` (`ForceRemuxMKV`), then `Run MKVPropEdit`.
+
+`RemuxMKV` passes `-fflags +genpts`. DivX-packed AVI carries packets with no
+timestamps; without generated timestamps the matroska muxer rejects them
+(`Can't write packet with unknown timestamp`) and writes a truncated stub — on
+one test file, 7 KB and 0.5 s instead of 91 MB and 13 minutes. ffmpeg still
+exits non-zero, so the flow takes the error branch, but the failure is silent
+in the sense that nothing downstream knows the container never converted.
+
+**`Force Remux` only handles MKV → MKV.** It is a container *repair* tool for
+files that fail stats tagging, not a general fallback, and it declines anything
+that is not already Matroska. So the error branch does not heal a failed
+container *conversion* — see Known wrinkles.
 
 **2. Size gate.** `File <= 100MB?` sends tiny files straight to the audio and
 subtitle cleanup, skipping video transcode entirely — not worth the GPU time.
@@ -110,12 +117,26 @@ smaller, `Set Original File` discards it and the original is kept.
 
 **4. Language cleanup.** `Remove Non English Audio` and `Remove Non English Subs`
 (local `CleanAudio` / `CleanSubs`) strip non-English tracks and commentary. SDH
-subtitles are kept.
+subtitles are kept, because `remove_sdh` is `false`.
+
+`CleanSubs` classifies a track as SDH from either the `hearing_impaired`
+disposition flag or an `sdh` in its title, and as commentary from either the
+`comment` disposition flag or a `comment` in its title. The two are kept
+separate on purpose: an earlier version folded the `sdh` title test into the
+commentary test, so `remove_commentary: true` silently deleted SDH tracks and
+`remove_sdh` was never consulted. Most releases label SDH in the title without
+setting the disposition flag, so that path was the one that actually fired.
 
 **5. Audio.** An ffmpeg-command block that plans one command and executes it
 once. The policy is **pass-through**: leave audio alone if it already
 direct-plays, and only convert what doesn't. `Begin Command` snapshots the
-streams, then:
+streams and `Force MKV Container` pins the output container, then:
+
+`Force MKV Container` is not cosmetic. `Begin Command` seeds the container from
+whatever the working file currently is, so if the stage-1 remux failed the
+block would happily write E-AC3 into an AVI — a combination AVI does not
+properly support. Pinning it to mkv means the audio command doubles as a
+container conversion when the earlier remux could not do it.
 
 - Three `checkAudioCodec` nodes ask in turn whether the file already has
   `eac3`, `ac3` or `aac`. Any hit skips straight to the drop step — no
@@ -123,11 +144,31 @@ streams, then:
   of shows already carry one of those three, so normalising everything to a
   single codec meant re-encoding almost the entire library for no playback
   benefit.
-- Only if none of the three is present does `Ensure EAC3 384k` run, cloning the
-  highest-channel-count English stream into E-AC3. It requests 6 channels and
-  the plugin clamps to `min(wanted, available)`, so 8ch → 5.1, 6ch → 5.1,
-  2ch → stereo. In practice this fires on DTS, TrueHD, FLAC, Opus, Vorbis and
-  MP3 sources.
+- Only if none of the three is present does an `Ensure EAC3` node run, cloning
+  the highest-channel-count English stream into E-AC3. Every tier requests 6
+  channels and the plugin clamps to `min(wanted, available)`, so 8ch → 5.1,
+  6ch → 5.1, 2ch → stereo, 1ch → mono. In practice this fires on DTS, TrueHD,
+  FLAC, Opus, Vorbis and MP3 sources.
+- **The target bitrate is tiered by channel count**, via a ladder of
+  `checkChannelCount` gates ahead of the Ensure nodes:
+
+  | channels | bitrate |
+  |---|---|
+  | 6, 8 | 384k |
+  | 2 | 192k |
+  | 1 | 96k |
+  | anything else | 384k |
+
+  A flat 384k is right for 5.1 but roughly 4× the source rate for a mono mp3,
+  and re-encoding cannot recover what the source already discarded — the file
+  just gets bigger. One `.avi` grew 88 → 115 MB (+30%) on a flat 384k, entirely
+  in the audio stream.
+
+  The gates test **exact** counts, so they are ordered largest-first: a file
+  carrying both a 5.1 track and a stereo commentary must take the 5.1 tier, and
+  checking 2ch first would mis-tier it. The final fallback is 384k rather than
+  the smallest tier, so an unusual count (4ch, 7ch) keeps the previous
+  behaviour instead of being quietly downgraded.
 - `Drop Incompatible Audio` then removes any audio stream whose `codec_name` is
   not one of `eac3,ac3,aac`. The condition must be **`not_equals`**, not
   `not_includes` — the plugin does substring matching for `includes`, and
@@ -145,17 +186,37 @@ streams, then:
   `-c copy`, so video and subtitles are remuxed, never re-encoded. If nothing
   changed, it skips ffmpeg entirely.
 
-**6. Finalise.** `Unchanged?` tests `ffmpegCommand.shouldProcess`; if the command
-did nothing, the flow goes straight to `Replace Original File` (which then also
-does nothing, since the file is byte-identical). Otherwise a second
-`Run MKVPropEdit` re-stamps statistics tags so the new audio track reports its
-real bitrate and size. Its `err1` output also goes to Replace — a tagging
-failure shouldn't discard a good transcode.
+**6. Finalise.** `File Changed?` (stock `checkFileChanged`) compares the working
+file against the original library file — by path *and* by size. If either
+differs, something upstream rewrote the file, so `Run MKVPropEdit` re-stamps
+statistics tags before `Replace Original File`. If nothing changed, the flow
+goes straight to Replace, which also does nothing, and the file is left
+byte-identical with its mtime intact.
 
-The check is deliberately phrased as *Unchanged?* (`== false`) rather than
-*Changed?*: if the template ever fails to resolve, the empty value won't match,
-so the flow falls through to restamping. Wrong-but-safe beats silently skipping
-stats after a real change.
+Every `Run MKVPropEdit` sits behind an `Is MKV?` (`checkFileExtension`) guard.
+mkvpropedit refuses anything that is not Matroska, and an unguarded call on a
+non-MKV working file fails, sets `flowFailed`, and drags the whole job to a
+`transcodeError` verdict even when the media itself is fine.
+
+The final restamp has **no `err1` edge**. It previously routed to
+`Replace Original File` on the theory that a tagging failure shouldn't discard
+a good transcode — but it cannot distinguish a good transcode from a bad one,
+so it committed whatever the pipeline produced, including results from runs
+that had already failed upstream. A failed flow must leave the library file
+alone; the working copy stays in cache and the job reports the error.
+
+This gate must key off the **file**, not off `ffmpegCommand.shouldProcess`. An
+earlier version tested that variable, which only reports whether the *audio*
+block did anything. A file that got a video transcode but no audio change —
+the common case, since ~90% of the library already carries a compatible audio
+codec — took the "unchanged" branch and kept the stats from before the encode.
+Such files ended up claiming their original h264 bitrate and byte count while
+actually holding a much smaller HEVC stream.
+
+Because the restamp now happens once at the very end, the two earlier
+`Run MKVPropEdit` nodes on the remux branches are redundant: anything they
+write is invalidated by the video transcode that follows. They are harmless but
+each costs a full file read.
 
 ## Graph
 
@@ -197,14 +258,24 @@ flowchart TD
     K2 -->|yes| DROP
     K2 -->|no| K3{Has AAC?}
     K3 -->|yes| DROP
-    K3 -->|no| ENS[Ensure EAC3 384k]
+    K3 -->|no| C6{6ch?}
+    C6 -->|yes| ENS[Ensure EAC3 384k]
+    C6 -->|no| C8{8ch?}
+    C8 -->|yes| ENS
+    C8 -->|no| C2{2ch?}
+    C2 -->|yes| ENS192[Ensure EAC3 192k]
+    C2 -->|no| C1{1ch?}
+    C1 -->|yes| ENS96[Ensure EAC3 96k]
+    C1 -->|no| ENS
     ENS --> DROP
+    ENS192 --> DROP
+    ENS96 --> DROP
     DROP --> KEEP[Keep One Audio Stream]
     KEEP --> ORDER[Reorder Streams]
     ORDER --> EXEC[Execute]
-    EXEC --> CHG{Unchanged?}
-    CHG -->|yes| REPL[Replace Original File]
-    CHG -->|no| PROP3[Run MKVPropEdit]
+    EXEC --> CHG{File Changed?}
+    CHG -->|no| REPL[Replace Original File]
+    CHG -->|yes| PROP3[Run MKVPropEdit]
     PROP3 --> REPL
 
     subgraph audio [Audio ffmpeg command block]
@@ -237,6 +308,20 @@ flowchart TD
   transcodes server-side — a performance cost, not a broken file.
 - **AV1 sources are transcoded to HEVC**, which is backwards efficiency-wise.
   One show in the library is affected.
+- **`Force Remux` cannot heal a failed container conversion.** It only accepts
+  MKV input, so when `RemuxMKV` fails on a non-MKV file the error branch is a
+  no-op and the file continues in its original container. The `genpts` fix
+  removes the common cause, but the gap remains for any other remux failure.
+  A general fallback would need a separate plugin that force-remuxes *to* MKV
+  from any container.
+- **The tiers are keyed on channel count, not source bitrate.** A 5.1 track
+  that arrived at 192k is still re-encoded at 384k. Channel count is the better
+  proxy in practice — bitrate on the incoming stream is often absent or wrong
+  in the container metadata — but a genuinely low-bitrate surround source will
+  still grow.
+- **The 100 MB size gate skips video transcode for SD content**, so old
+  `mpeg4`/DivX files keep their original codec however outdated. Deliberate,
+  but it means the `.avi` set is never modernised beyond container and audio.
 - **A file with no English audio keeps its foreign track.** `CleanAudio` refuses
   to strip the last audio stream, and `keepOneAudioStream` then keeps whatever
   survived. Better than a silent file, but "one English track" is not guaranteed

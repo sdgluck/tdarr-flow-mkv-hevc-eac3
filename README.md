@@ -5,9 +5,8 @@
 - **English audio only**, in a directly playable codec — at most one surround
   track and one stereo/mono track, surround first
 - **English subtitles only**, no commentary
-- accurate track statistics tags
-
-Files that already match are left byte-identical, with mtime intact.
+- Accurate track statistics tags
+- Files that already match are left alone
 
 ## Stages
 

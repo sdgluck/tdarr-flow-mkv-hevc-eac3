@@ -1,11 +1,4 @@
-# Transcode Pipeline
-
-A single Tdarr flow (`a_CeSjPzb`, `flows/transcode-pipeline.json`), applied to
-both the TV and Film libraries.
-
-## Goal
-
-Bring every file in the library to:
+# tdarr-flow-mkv-hevc-eac3
 
 - **MKV** container
 - **HEVC** video
@@ -45,11 +38,11 @@ Each remux branch is followed by `Run MKVPropEdit`, behind an `Is MKV?`
 `Is HEVC?` passes HEVC files straight through. Otherwise the encoder is chosen
 by node name:
 
-| condition | plugin |
-|---|---|
-| `Nvidia?` | `Migz1FFMPEG` (NVENC) |
-| `Intel?` | `Boosh_FFMPEG_QSV_HEVC` (QuickSync) |
-| otherwise | `Migz1FFMPEG_CPU` |
+| condition | plugin                              |
+| --------- | ----------------------------------- |
+| `Nvidia?` | `Migz1FFMPEG` (NVENC)               |
+| `Intel?`  | `Boosh_FFMPEG_QSV_HEVC` (QuickSync) |
+| otherwise | `Migz1FFMPEG_CPU`                   |
 
 NVENC and QuickSync fall back to the CPU encoder on error; a CPU failure routes
 through `Reset Flow Error` to `Set Original File`, keeping the source.
@@ -75,13 +68,13 @@ pass over the file.
 
 An ffmpeg-command block that plans one command and executes it once. Result:
 
-| source audio | result |
-|---|---|
-| surround (4–8ch), with or without stereo | E-AC3 surround + E-AC3 2.0 @192k |
-| 7.1 | downmixed to 5.1, plus E-AC3 2.0 @192k |
-| stereo only | single E-AC3 2.0 @192k |
-| mono only | single E-AC3 1.0 @96k |
-| no English track | left untouched |
+| source audio                             | result                                 |
+| ---------------------------------------- | -------------------------------------- |
+| surround (4–8ch), with or without stereo | E-AC3 surround + E-AC3 2.0 @192k       |
+| 7.1                                      | downmixed to 5.1, plus E-AC3 2.0 @192k |
+| stereo only                              | single E-AC3 2.0 @192k                 |
+| mono only                                | single E-AC3 1.0 @96k                  |
+| no English track                         | left untouched                         |
 
 The layout is decided by channel count alone, not by existing codec.
 
@@ -120,7 +113,7 @@ nodes report "File already has…" and nothing is re-encoded.
 original library file by path **and** size.
 
 - Changed → `Run MKVPropEdit` re-stamps statistics tags → `Replace Original
-  File`.
+File`.
 - Unchanged → straight to `Replace Original File`, which is itself a no-op.
 
 The final `Run MKVPropEdit` has no `err1` edge, so a failed run never commits to

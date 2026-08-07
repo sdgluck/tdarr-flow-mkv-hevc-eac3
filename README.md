@@ -2,8 +2,8 @@
 
 - **MKV** container
 - **HEVC** video
-- **English audio only**, in a directly playable codec — at most one surround
-  track and one stereo/mono track, surround first
+- **English audio only**, directly playable codec
+- At most one surround track and one stereo/mono track, surround first
 - **English subtitles only**, no commentary
 - Accurate track statistics tags
 - Files that already match are left alone

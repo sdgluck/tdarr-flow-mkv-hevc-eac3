@@ -1,5 +1,5 @@
 {
-  "name": "tdarr-config",
+  "name": "tdarr-flow-mkv-hevc-eac3",
   "private": true,
   "type": "module",
   "scripts": {

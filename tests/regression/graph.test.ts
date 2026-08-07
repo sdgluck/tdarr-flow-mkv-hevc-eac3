@@ -50,40 +50,41 @@ describe('invariants the pipeline depends on', () => {
     }
   });
 
-  it('drops incompatible audio with not_equals, never not_includes', () => {
-    // The plugin substring-matches for the *includes* conditions, and
-    // "eac3".includes("ac3") is true, which would silently keep the wrong
-    // stream.
-    const drop = flow.node(nodes.dropIncompatible);
-    expect(drop.inputsDB?.condition).toBe('not_equals');
-    expect(drop.inputsDB?.valuesToRemove).toBe('eac3,ac3,aac');
+  it('decides the audio layout from channel counts, not from codec presence', () => {
+    // The old design asked "does ANY stream have eac3/ac3/aac?" and skipped the
+    // whole ladder on a hit, which discarded a surround track whenever a stereo
+    // one happened to direct-play. Layout is now decided by channels alone.
+    expect(flow.byPlugin('checkAudioCodec')).toEqual([]);
+    expect(flow.node(nodes.hasSurround).inputsDB?.propertyToCheck).toBe('channels');
+    expect(flow.node(nodes.hasSurround).inputsDB?.valuesToMatch).toBe('4,5,6,7,8');
   });
 
-  it('tests channel counts largest-first', () => {
-    // checkChannelCount matches exactly, so a file carrying both a 5.1 track
-    // and a stereo commentary must hit the 5.1 tier. Checking 2ch first would
-    // mis-tier it.
-    const ladder: number[] = [];
-    let id: string | null = nodes.ch6;
-    while (id !== null && flow.node(id).pluginName === 'checkChannelCount') {
-      ladder.push(Number(flow.node(id).inputsDB?.channelCount));
-      id = flow.target(id, '2');
+  it('generates a stereo mate for every surround track', () => {
+    // A surround file must come out with both, so a client that cannot handle
+    // surround has something to play without a server-side transcode.
+    expect(flow.target(nodes.hasSurround, '1')).toBe(nodes.ensureSurround);
+    expect(flow.target(nodes.ensureSurround, '1')).toBe(nodes.ensureStereo);
+  });
+
+  it('keeps mono as mono rather than upmixing it', () => {
+    expect(flow.target(nodes.hasStereo, '2')).toBe(nodes.ensureMono);
+    expect(flow.node(nodes.ensureMono).inputsDB?.channels).toBe('1');
+    expect(flow.node(nodes.ensureMono).inputsDB?.bitrate).toBe('96k');
+  });
+
+  it('normalises the surviving tracks after every Ensure', () => {
+    // Ensure only adds; without this the original stereo track would survive
+    // alongside the freshly generated one.
+    for (const source of [nodes.ensureStereo, nodes.ensureMono]) {
+      expect(flow.target(source, '1')).toBe(nodes.normalise);
     }
-    expect(ladder).toEqual([6, 8, 2, 1]);
+    expect(flow.node(nodes.normalise).pluginName).toBe('normaliseAudioTracks');
   });
 
-  it('falls through to the 384k tier rather than the smallest', () => {
-    // An unusual count (4ch, 7ch) must keep the previous behaviour rather than
-    // being quietly downgraded.
-    const fallthrough = flow.target(nodes.ch1, '2');
-    expect(fallthrough).not.toBeNull();
-    expect(flow.node(fallthrough as string).inputsDB?.bitrate).toBe('384k');
-  });
-
-  it('reduces to one audio stream only after the codec drop', () => {
-    // Picking a favourite first could select a stream the drop step then
-    // removes, leaving the file with no audio at all.
-    expect(flow.target(nodes.dropIncompatible, '1')).toBe(nodes.keepOne);
+  it('lets the audio ordering come from the local plugin, not Reorder Streams', () => {
+    // Reorder's channel map only knows 8/6/2/1, so a 4-channel track sorts as
+    // an empty string and gets pulled behind a stereo one.
+    expect(flow.node(nodes.reorder).inputsDB?.processOrder).toBe('streamTypes');
   });
 
   it('pins the container to mkv before planning audio streams', () => {
@@ -94,10 +95,58 @@ describe('invariants the pipeline depends on', () => {
     expect(flow.node(nodes.setContainer).inputsDB?.container).toBe('mkv');
   });
 
+  it('gives every encoder a fallback rather than failing the job', () => {
+    // A transient GPU failure used to kill the whole job. NVENC and QuickSync
+    // now fall back to the CPU encoder; a CPU failure reverts to the original
+    // and carries on without the transcode.
+    for (const encoder of [nodes.encodeNvidia, nodes.encodeQsv]) {
+      expect(flow.target(encoder, 'err1')).toBe(nodes.encodeCpu);
+    }
+    const cpuFallback = flow.target(nodes.encodeCpu, 'err1');
+    expect(cpuFallback).not.toBeNull();
+    expect(flow.node(cpuFallback as string).pluginName).toBe('resetFlowError');
+  });
+
+  it('leaves Execute without an error edge, deliberately', () => {
+    // If ffmpeg fails the working file is bad. Every onward path eventually
+    // commits, so failing the job is the only safe outcome.
+    expect(flow.usedHandles(nodes.execute)).not.toContain('err1');
+  });
+
+  it('cleans language tracks in a single pass', () => {
+    // Audio and subtitle cleanup were two separate classic plugins, each doing
+    // a full read-and-rewrite of the file.
+    const classicAfterEncode = flow
+      .byPlugin('runClassicTranscodePlugin')
+      .filter((n) => n.inputsDB?.pluginSourceId?.includes('Clean'));
+    expect(classicAfterEncode).toHaveLength(1);
+    expect(classicAfterEncode[0]?.inputsDB?.pluginSourceId)
+      .toBe('Local:Tdarr_Plugin_bsh1_CleanTracks');
+  });
+
+  it('uses one version of runClassicTranscodePlugin throughout', () => {
+    const versions = [...new Set(flow.byPlugin('runClassicTranscodePlugin').map((n) => n.version))];
+    expect(versions).toEqual(['2.0.0']);
+  });
+
+  it('reports no lint findings at all', () => {
+    // Covers unreachable nodes, impossible handles, dead ends, mixed versions
+    // and overlapping node positions in one assertion.
+    const findings = lint(flow, {
+      registry,
+      ignore: [
+        'missing-error-edge:audProped',
+        'missing-error-edge:audExec001',
+        'unwired-handle:gateMedium',
+      ],
+    });
+    expect(findings.map((f) => `${f.rule}: ${f.message}`)).toEqual([]);
+  });
+
   it('routes an oversized transcode away from the audio block', () => {
     // Whether handle 3 exists at all is a separate question - see
     // tests/findings/size-guard.test.ts. This only asserts the intent is wired.
     expect(flow.target(nodes.sizeRatio, '3')).toBe(nodes.setOriginal);
-    expect(flow.target(nodes.setOriginal, '1')).toBe(nodes.cleanAudio);
+    expect(flow.target(nodes.setOriginal, '1')).toBe(nodes.cleanTracks);
   });
 });

@@ -84,38 +84,7 @@ describe('ForceRemuxMKV', () => {
   });
 });
 
-describe('CleanAudio', () => {
-  it('removes non-English audio', () => {
-    const file = probe.file({
-      streams: [probe.video(), probe.audio({ language: 'eng' }), probe.audio({ language: 'fre' })],
-    });
-    const result = call('Tdarr_Plugin_bsh1_CleanAudio', file, { tag_language: 'eng' });
-
-    expect(result.processFile).toBe(true);
-    expect(result.preset).toContain('-map -0:2');
-  });
-
-  it('refuses to strip the last audio stream', () => {
-    // Better a foreign track than a silent file.
-    const file = probe.file({ streams: [probe.video(), probe.audio({ language: 'fre' })] });
-    const result = call('Tdarr_Plugin_bsh1_CleanAudio', file, { tag_language: 'eng' });
-
-    expect(result.processFile).toBe(false);
-    expect(result.infoLog).toContain('would leave no audio');
-  });
-
-  it('keeps audio that carries no language tag', () => {
-    const file = probe.file({
-      streams: [probe.video(), probe.audio({ language: null }), probe.audio({ language: 'fre' })],
-    });
-    const result = call('Tdarr_Plugin_bsh1_CleanAudio', file, { tag_language: 'eng' });
-
-    expect(result.preset).toContain('-map -0:2');
-    expect(result.preset).not.toContain('-map -0:1');
-  });
-});
-
-describe('CleanSubs', () => {
+describe('CleanTracks', () => {
   const inputs = (overrides: ClassicPluginInputs = {}) => ({
     tag_language: 'eng',
     remove_commentary: 'true',
@@ -123,28 +92,88 @@ describe('CleanSubs', () => {
     ...overrides,
   });
 
+  it('removes non-English audio and subtitles in one pass', () => {
+    const file = probe.file({
+      streams: [
+        probe.video(),
+        probe.audio({ language: 'eng' }),
+        probe.audio({ language: 'fre' }),
+        probe.subtitle({ language: 'fre' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.processFile).toBe(true);
+    expect(result.preset).toContain('-map -0:2');
+    expect(result.preset).toContain('-map -0:3');
+  });
+
+  it('passes analyzeduration and probesize as input args', () => {
+    // The two plugins this replaced disagreed about this.
+    const file = probe.file({
+      streams: [probe.video(), probe.audio({ language: 'fre' }), probe.audio({ language: 'eng' })],
+    });
+    const [inputArgs = ''] = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).preset.split(',');
+
+    expect(inputArgs).toContain('-analyzeduration');
+    expect(inputArgs).toContain('-probesize');
+  });
+
+  it('refuses to strip the last audio stream', () => {
+    // Better a foreign track than a silent file.
+    const file = probe.file({ streams: [probe.video(), probe.audio({ language: 'fre' })] });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.processFile).toBe(false);
+    expect(result.infoLog).toContain('would leave no audio');
+  });
+
+  it('still removes foreign subtitles when it has to keep foreign audio', () => {
+    const file = probe.file({
+      streams: [
+        probe.video(),
+        probe.audio({ language: 'fre' }),
+        probe.subtitle({ language: 'fre' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.processFile).toBe(true);
+    expect(result.preset).toContain('-map -0:2');
+    expect(result.preset).not.toContain('-map -0:1');
+  });
+
+  it('keeps audio that carries no language tag', () => {
+    const file = probe.file({
+      streams: [probe.video(), probe.audio({ language: null }), probe.audio({ language: 'fre' })],
+    });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.preset).toContain('-map -0:2');
+    expect(result.preset).not.toContain('-map -0:1');
+  });
+
   it('keeps SDH when remove_sdh is false, even with remove_commentary on', () => {
-    // The bug this replaced: folding the `sdh` title test into the commentary
-    // test meant remove_commentary silently deleted SDH tracks and remove_sdh
-    // was never consulted. Most releases label SDH in the title only.
+    // Folding the sdh title test into the commentary test silently deleted SDH
+    // tracks, and most releases label SDH in the title only.
     const file = probe.file({
       streams: [probe.video(), probe.audio(), probe.subtitle({ title: 'English SDH' })],
     });
-    expect(call('Tdarr_Plugin_bsh1_CleanSubs', file, inputs()).processFile).toBe(false);
+    expect(call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).processFile).toBe(false);
   });
 
   it('recognises SDH by disposition as well as by title', () => {
     const file = probe.file({
       streams: [probe.video(), probe.audio(), probe.subtitle({ hearingImpaired: true })],
     });
-    expect(call('Tdarr_Plugin_bsh1_CleanSubs', file, inputs()).processFile).toBe(false);
+    expect(call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).processFile).toBe(false);
   });
 
   it('removes SDH when remove_sdh is true', () => {
     const file = probe.file({
       streams: [probe.video(), probe.audio(), probe.subtitle({ title: 'English SDH' })],
     });
-    const result = call('Tdarr_Plugin_bsh1_CleanSubs', file, inputs({ remove_sdh: 'true' }));
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs({ remove_sdh: 'true' }));
     expect(result.preset).toContain('-map -0:2');
   });
 
@@ -152,13 +181,6 @@ describe('CleanSubs', () => {
     const file = probe.file({
       streams: [probe.video(), probe.audio(), probe.subtitle({ commentary: true })],
     });
-    expect(call('Tdarr_Plugin_bsh1_CleanSubs', file, inputs()).preset).toContain('-map -0:2');
-  });
-
-  it('removes non-English subtitles', () => {
-    const file = probe.file({
-      streams: [probe.video(), probe.audio(), probe.subtitle({ language: 'fre' })],
-    });
-    expect(call('Tdarr_Plugin_bsh1_CleanSubs', file, inputs()).preset).toContain('-map -0:2');
+    expect(call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).preset).toContain('-map -0:2');
   });
 });

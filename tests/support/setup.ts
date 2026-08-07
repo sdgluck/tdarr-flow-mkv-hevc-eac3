@@ -16,6 +16,8 @@ export const paths = {
   flow: join(repoRoot, 'flows', 'transcode-pipeline.json'),
   classicPluginDir: join(repoRoot, 'plugins', 'Local'),
   flowPluginDir: join(repoRoot, 'plugins', 'FlowPlugins', 'LocalFlowPlugins'),
+  /** The flow as it was before the readability and audio guards were added. */
+  preGuardFlow: join(repoRoot, 'tests', 'fixtures', 'transcode-pipeline.pre-guards.json'),
 };
 
 export const flow = Flow.fromFile(paths.flow);
@@ -28,6 +30,21 @@ export const registry = buildRegistry({
 /** Runs a file through the real flow with this repo's real plugins. */
 export function run(file: TdarrFile, options: Partial<SimulateOptions> = {}): SimulationResult {
   return simulate(flow, file, {
+    nodeName: 'Nvidia',
+    classicPluginDir: paths.classicPluginDir,
+    flowPluginDir: paths.flowPluginDir,
+    registry,
+    ...options,
+  });
+}
+
+/** Same as `run`, against a different flow - used to replay captured logs. */
+export function runOn(
+  target: Flow,
+  file: TdarrFile,
+  options: Partial<SimulateOptions> = {},
+): SimulationResult {
+  return simulate(target, file, {
     nodeName: 'Nvidia',
     classicPluginDir: paths.classicPluginDir,
     flowPluginDir: paths.flowPluginDir,
@@ -49,22 +66,16 @@ export const nodes = {
   encodeCpu: 'audCpuEnc',
   sizeRatio: 'JBA2N2W7L',
   setOriginal: 'ksKmTCZB0',
-  cleanAudio: 'aQKzSWY-r',
-  cleanSubs: 'ZvfzKZ6Nw',
+  cleanTracks: 'aQKzSWY-r',
   beginCommand: 'audStart01',
   setContainer: 'audSetCont',
-  hasEac3: 'audChkEac',
-  hasAc3: 'audChkAc3',
-  hasAac: 'audChkAac',
-  ch6: 'audCh6',
-  ch8: 'audCh8',
-  ch2: 'audCh2',
-  ch1: 'audCh1',
-  ensure384: 'audEnsure1',
-  ensure192: 'audEns192',
-  ensure96: 'audEns96',
-  dropIncompatible: 'audStrip01',
-  keepOne: 'audKeep1',
+  hasSurround: 'audHasSurr',
+  hasStereo: 'audHasSter',
+  ensureSurround: 'audEnsSurr',
+  ensureStereo: 'audEnsSt',
+  ensureMono: 'audEnsMono',
+  normalise: 'audNorm',
+  mediumGate: 'gateMedium',
   reorder: 'audReorder',
   execute: 'audExec001',
   fileChanged: 'audChgChk',

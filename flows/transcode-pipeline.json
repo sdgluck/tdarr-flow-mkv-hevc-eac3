@@ -155,36 +155,21 @@
       }
     },
     {
-      "name": "Remove Non English Audio",
+      "name": "Remove Non English Tracks",
       "sourceRepo": "Community",
       "pluginName": "runClassicTranscodePlugin",
       "version": "2.0.0",
       "inputsDB": {
-        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_CleanAudio",
-        "remove_commentary": "true"
+        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_CleanTracks",
+        "tag_language": "eng",
+        "remove_commentary": "true",
+        "remove_sdh": "false"
       },
       "fpEnabled": true,
       "id": "aQKzSWY-r",
       "position": {
         "x": 624,
         "y": 168
-      }
-    },
-    {
-      "name": "Remove Non English Subs",
-      "sourceRepo": "Community",
-      "pluginName": "runClassicTranscodePlugin",
-      "version": "2.0.0",
-      "inputsDB": {
-        "pluginSourceId": "Local:Tdarr_Plugin_bsh1_CleanSubs",
-        "remove_commentary": "true",
-        "remove_sdh": "false"
-      },
-      "fpEnabled": true,
-      "id": "ZvfzKZ6Nw",
-      "position": {
-        "x": 624,
-        "y": 240
       }
     },
     {
@@ -200,93 +185,6 @@
       }
     },
     {
-      "name": "Has EAC3?",
-      "sourceRepo": "Community",
-      "pluginName": "checkAudioCodec",
-      "version": "1.0.0",
-      "inputsDB": {
-        "codec": "eac3",
-        "checkBitrate": "false"
-      },
-      "fpEnabled": true,
-      "id": "audChkEac",
-      "position": {
-        "x": 624,
-        "y": 384
-      }
-    },
-    {
-      "name": "Has AC3?",
-      "sourceRepo": "Community",
-      "pluginName": "checkAudioCodec",
-      "version": "1.0.0",
-      "inputsDB": {
-        "codec": "ac3",
-        "checkBitrate": "false"
-      },
-      "fpEnabled": true,
-      "id": "audChkAc3",
-      "position": {
-        "x": 624,
-        "y": 456
-      }
-    },
-    {
-      "name": "Has AAC?",
-      "sourceRepo": "Community",
-      "pluginName": "checkAudioCodec",
-      "version": "1.0.0",
-      "inputsDB": {
-        "codec": "aac",
-        "checkBitrate": "false"
-      },
-      "fpEnabled": true,
-      "id": "audChkAac",
-      "position": {
-        "x": 624,
-        "y": 528
-      }
-    },
-    {
-      "name": "Ensure EAC3 384k",
-      "sourceRepo": "Community",
-      "pluginName": "ffmpegCommandEnsureAudioStream",
-      "version": "1.0.0",
-      "inputsDB": {
-        "audioEncoder": "eac3",
-        "language": "eng",
-        "channels": "6",
-        "enableBitrate": "true",
-        "bitrate": "384k",
-        "enableSamplerate": "false",
-        "samplerate": "48k"
-      },
-      "fpEnabled": true,
-      "id": "audEnsure1",
-      "position": {
-        "x": 444,
-        "y": 600
-      }
-    },
-    {
-      "name": "Drop Incompatible Audio",
-      "sourceRepo": "Community",
-      "pluginName": "ffmpegCommandRemoveStreamByProperty",
-      "version": "1.0.0",
-      "inputsDB": {
-        "codecType": "audio",
-        "propertyToCheck": "codec_name",
-        "valuesToRemove": "eac3,ac3,aac",
-        "condition": "not_equals"
-      },
-      "fpEnabled": true,
-      "id": "audStrip01",
-      "position": {
-        "x": 624,
-        "y": 672
-      }
-    },
-    {
       "name": "Execute",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandExecute",
@@ -299,30 +197,12 @@
       }
     },
     {
-      "name": "Keep One Audio Stream",
-      "sourceRepo": "Local",
-      "pluginName": "keepOneAudioStream",
-      "version": "1.0.0",
-      "inputsDB": {
-        "language": "eng"
-      },
-      "fpEnabled": true,
-      "id": "audKeep1",
-      "position": {
-        "x": 624,
-        "y": 744
-      }
-    },
-    {
       "name": "Reorder Streams",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandRorderStreams",
       "version": "1.0.0",
       "inputsDB": {
-        "processOrder": "codecs,channels,languages,streamTypes",
-        "languages": "",
-        "channels": "7.1,5.1,2,1",
-        "codecs": "",
+        "processOrder": "streamTypes",
         "streamTypes": "video,audio,subtitle"
       },
       "fpEnabled": true,
@@ -342,7 +222,7 @@
       "id": "audChgChk",
       "position": {
         "x": 624,
-        "y": 888
+        "y": 960
       }
     },
     {
@@ -354,7 +234,7 @@
       "id": "audProped",
       "position": {
         "x": 420,
-        "y": 960
+        "y": 1040
       }
     },
     {
@@ -366,14 +246,14 @@
       "id": "XLXwY90TH",
       "position": {
         "x": 624,
-        "y": 1032
+        "y": 1120
       }
     },
     {
       "name": "Force Remux",
       "sourceRepo": "Community",
       "pluginName": "runClassicTranscodePlugin",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "inputsDB": {
         "pluginSourceId": "Local:Tdarr_Plugin_bsh1_ForceRemuxMKV"
       },
@@ -470,7 +350,7 @@
       },
       "position": {
         "x": 624,
-        "y": 1010
+        "y": 1040
       }
     },
     {
@@ -490,105 +370,154 @@
       }
     },
     {
-      "id": "audEns192",
-      "name": "Ensure EAC3 192k",
+      "name": "Readable Video?",
+      "sourceRepo": "Community",
+      "pluginName": "checkFileMedium",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "gateMedium",
+      "position": {
+        "x": 564,
+        "y": -672
+      }
+    },
+    {
+      "id": "audHasSurr",
+      "name": "Surround Present?",
+      "sourceRepo": "Community",
+      "pluginName": "checkStreamProperty",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "position": {
+        "x": 624,
+        "y": 384
+      },
+      "inputsDB": {
+        "streamType": "audio",
+        "propertyToCheck": "channels",
+        "valuesToMatch": "4,5,6,7,8",
+        "condition": "equals"
+      }
+    },
+    {
+      "id": "audHasSter",
+      "name": "Stereo Present?",
+      "sourceRepo": "Community",
+      "pluginName": "checkStreamProperty",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "position": {
+        "x": 380,
+        "y": 470
+      },
+      "inputsDB": {
+        "streamType": "audio",
+        "propertyToCheck": "channels",
+        "valuesToMatch": "2,3",
+        "condition": "equals"
+      }
+    },
+    {
+      "id": "audEnsSurr",
+      "name": "Ensure E-AC3 Surround 384k",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandEnsureAudioStream",
       "version": "1.0.0",
       "fpEnabled": true,
+      "position": {
+        "x": 860,
+        "y": 460
+      },
       "inputsDB": {
         "audioEncoder": "eac3",
         "language": "eng",
         "channels": "6",
+        "enableBitrate": "true",
+        "bitrate": "384k",
+        "enableSamplerate": "false",
+        "samplerate": "48k"
+      }
+    },
+    {
+      "id": "audEnsSt",
+      "name": "Ensure E-AC3 Stereo 192k",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandEnsureAudioStream",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "position": {
+        "x": 624,
+        "y": 560
+      },
+      "inputsDB": {
+        "audioEncoder": "eac3",
+        "language": "eng",
+        "channels": "2",
         "enableBitrate": "true",
         "bitrate": "192k",
         "enableSamplerate": "false",
         "samplerate": "48k"
-      },
-      "position": {
-        "x": 980,
-        "y": 560
       }
     },
     {
-      "id": "audEns96",
-      "name": "Ensure EAC3 96k",
+      "id": "audEnsMono",
+      "name": "Ensure E-AC3 Mono 96k",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandEnsureAudioStream",
       "version": "1.0.0",
       "fpEnabled": true,
+      "position": {
+        "x": 200,
+        "y": 560
+      },
       "inputsDB": {
         "audioEncoder": "eac3",
         "language": "eng",
-        "channels": "6",
+        "channels": "1",
         "enableBitrate": "true",
         "bitrate": "96k",
         "enableSamplerate": "false",
         "samplerate": "48k"
-      },
-      "position": {
-        "x": 980,
-        "y": 700
       }
     },
     {
-      "id": "audCh6",
-      "name": "6ch?",
-      "sourceRepo": "Community",
-      "pluginName": "checkChannelCount",
+      "id": "audNorm",
+      "name": "Normalise Audio Tracks",
+      "sourceRepo": "Local",
+      "pluginName": "normaliseAudioTracks",
       "version": "1.0.0",
       "fpEnabled": true,
-      "inputsDB": {
-        "channelCount": "6"
-      },
       "position": {
-        "x": 300,
-        "y": 420
+        "x": 624,
+        "y": 660
+      },
+      "inputsDB": {
+        "targetCodec": "eac3",
+        "surroundMinChannels": "4"
       }
     },
     {
-      "id": "audCh8",
-      "name": "8ch?",
+      "id": "rstEnc",
+      "name": "Reset Flow Error",
       "sourceRepo": "Community",
-      "pluginName": "checkChannelCount",
+      "pluginName": "resetFlowError",
       "version": "1.0.0",
       "fpEnabled": true,
-      "inputsDB": {
-        "channelCount": "8"
-      },
       "position": {
-        "x": 300,
-        "y": 560
+        "x": 1320,
+        "y": -60
       }
     },
     {
-      "id": "audCh2",
-      "name": "2ch?",
+      "id": "rstClean",
+      "name": "Reset Flow Error",
       "sourceRepo": "Community",
-      "pluginName": "checkChannelCount",
+      "pluginName": "resetFlowError",
       "version": "1.0.0",
       "fpEnabled": true,
-      "inputsDB": {
-        "channelCount": "2"
-      },
       "position": {
-        "x": 300,
-        "y": 700
-      }
-    },
-    {
-      "id": "audCh1",
-      "name": "1ch?",
-      "sourceRepo": "Community",
-      "pluginName": "checkChannelCount",
-      "version": "1.0.0",
-      "fpEnabled": true,
-      "inputsDB": {
-        "channelCount": "1"
-      },
-      "position": {
-        "x": 300,
-        "y": 840
+        "x": 380,
+        "y": 200
       }
     }
   ],
@@ -641,34 +570,6 @@
       "target": "aQKzSWY-r",
       "targetHandle": null,
       "id": "edge17"
-    },
-    {
-      "source": "aQKzSWY-r",
-      "sourceHandle": "1",
-      "target": "ZvfzKZ6Nw",
-      "targetHandle": null,
-      "id": "edge18"
-    },
-    {
-      "source": "aQKzSWY-r",
-      "sourceHandle": "2",
-      "target": "ZvfzKZ6Nw",
-      "targetHandle": null,
-      "id": "edge19"
-    },
-    {
-      "source": "ZvfzKZ6Nw",
-      "sourceHandle": "1",
-      "target": "audStart01",
-      "targetHandle": null,
-      "id": "edge20"
-    },
-    {
-      "source": "ZvfzKZ6Nw",
-      "sourceHandle": "2",
-      "target": "audStart01",
-      "targetHandle": null,
-      "id": "edge21"
     },
     {
       "source": "aRB7_yBQE",
@@ -790,13 +691,6 @@
       "id": "f9Ts5nvuj"
     },
     {
-      "source": "_YTuyCZg3",
-      "sourceHandle": "1",
-      "target": "M_mrP-J_d",
-      "targetHandle": null,
-      "id": "Xuczobv0P"
-    },
-    {
       "source": "audReorder",
       "sourceHandle": "1",
       "target": "audExec001",
@@ -830,76 +724,6 @@
       "target": "JBA2N2W7L",
       "targetHandle": null,
       "id": "cpu-e3"
-    },
-    {
-      "source": "audSetCont",
-      "sourceHandle": "1",
-      "target": "audChkEac",
-      "targetHandle": null,
-      "id": "aud-e3"
-    },
-    {
-      "source": "audChkEac",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "aud-e20"
-    },
-    {
-      "source": "audChkEac",
-      "sourceHandle": "2",
-      "target": "audChkAc3",
-      "targetHandle": null,
-      "id": "aud-e21"
-    },
-    {
-      "source": "audChkAc3",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "aud-e22"
-    },
-    {
-      "source": "audChkAc3",
-      "sourceHandle": "2",
-      "target": "audChkAac",
-      "targetHandle": null,
-      "id": "aud-e23"
-    },
-    {
-      "source": "audChkAac",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "aud-e24"
-    },
-    {
-      "source": "audChkAac",
-      "sourceHandle": "2",
-      "target": "audCh6",
-      "targetHandle": null,
-      "id": "aud-e25"
-    },
-    {
-      "source": "audEnsure1",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "aud-e4"
-    },
-    {
-      "source": "audStrip01",
-      "sourceHandle": "1",
-      "target": "audKeep1",
-      "targetHandle": null,
-      "id": "aud-e5"
-    },
-    {
-      "source": "audKeep1",
-      "sourceHandle": "1",
-      "target": "audReorder",
-      "targetHandle": null,
-      "id": "aud-e26"
     },
     {
       "source": "audExec001",
@@ -986,94 +810,144 @@
       "type": "smoothstep"
     },
     {
-      "source": "audCh6",
+      "id": "medium-in",
+      "source": "_YTuyCZg3",
       "sourceHandle": "1",
-      "target": "audEnsure1",
-      "targetHandle": null,
-      "id": "reactflow__edge-audCh61-audEnsure1null",
-      "animated": true,
-      "type": "smoothstep"
+      "target": "gateMedium",
+      "targetHandle": null
     },
     {
-      "source": "audCh6",
+      "id": "medium-video",
+      "source": "gateMedium",
+      "sourceHandle": "1",
+      "target": "M_mrP-J_d",
+      "targetHandle": null
+    },
+    {
+      "id": "aud-n1",
+      "source": "audSetCont",
+      "sourceHandle": "1",
+      "target": "audHasSurr",
+      "targetHandle": null
+    },
+    {
+      "id": "aud-n2",
+      "source": "audHasSurr",
+      "sourceHandle": "1",
+      "target": "audEnsSurr",
+      "targetHandle": null
+    },
+    {
+      "id": "aud-n3",
+      "source": "audEnsSurr",
+      "sourceHandle": "1",
+      "target": "audEnsSt",
+      "targetHandle": null
+    },
+    {
+      "id": "aud-n4",
+      "source": "audHasSurr",
       "sourceHandle": "2",
-      "target": "audCh8",
-      "targetHandle": null,
-      "id": "reactflow__edge-audCh62-audCh8null",
-      "animated": true,
-      "type": "smoothstep"
+      "target": "audHasSter",
+      "targetHandle": null
     },
     {
-      "source": "audCh8",
+      "id": "aud-n5",
+      "source": "audHasSter",
       "sourceHandle": "1",
-      "target": "audEnsure1",
-      "targetHandle": null,
-      "id": "reactflow__edge-audCh81-audEnsure1null",
-      "animated": true,
-      "type": "smoothstep"
+      "target": "audEnsSt",
+      "targetHandle": null
     },
     {
-      "source": "audCh8",
+      "id": "aud-n6",
+      "source": "audHasSter",
       "sourceHandle": "2",
-      "target": "audCh2",
-      "targetHandle": null,
-      "id": "reactflow__edge-audCh82-audCh2null",
-      "animated": true,
-      "type": "smoothstep"
+      "target": "audEnsMono",
+      "targetHandle": null
     },
     {
-      "source": "audCh2",
+      "id": "aud-n7",
+      "source": "audEnsSt",
       "sourceHandle": "1",
-      "target": "audEns192",
-      "targetHandle": null,
-      "id": "reactflow__edge-audCh21-audEns192null",
-      "animated": true,
-      "type": "smoothstep"
+      "target": "audNorm",
+      "targetHandle": null
     },
     {
-      "source": "audCh2",
+      "id": "aud-n8",
+      "source": "audEnsMono",
+      "sourceHandle": "1",
+      "target": "audNorm",
+      "targetHandle": null
+    },
+    {
+      "id": "aud-n9",
+      "source": "audNorm",
+      "sourceHandle": "1",
+      "target": "audReorder",
+      "targetHandle": null
+    },
+    {
+      "id": "enc-err-nv",
+      "source": "aRB7_yBQE",
+      "sourceHandle": "err1",
+      "target": "audCpuEnc",
+      "targetHandle": null
+    },
+    {
+      "id": "enc-err-qsv",
+      "source": "L5oZNsSMG",
+      "sourceHandle": "err1",
+      "target": "audCpuEnc",
+      "targetHandle": null
+    },
+    {
+      "id": "enc-err-cpu",
+      "source": "audCpuEnc",
+      "sourceHandle": "err1",
+      "target": "rstEnc",
+      "targetHandle": null
+    },
+    {
+      "id": "enc-err-rst",
+      "source": "rstEnc",
+      "sourceHandle": "1",
+      "target": "ksKmTCZB0",
+      "targetHandle": null
+    },
+    {
+      "id": "clean-err-a",
+      "source": "aQKzSWY-r",
+      "sourceHandle": "err1",
+      "target": "rstClean",
+      "targetHandle": null
+    },
+    {
+      "id": "clean-err-rst",
+      "source": "rstClean",
+      "sourceHandle": "1",
+      "target": "audStart01",
+      "targetHandle": null
+    },
+    {
+      "id": "clean-1",
+      "source": "aQKzSWY-r",
+      "sourceHandle": "1",
+      "target": "audStart01",
+      "targetHandle": null
+    },
+    {
+      "id": "clean-2",
+      "source": "aQKzSWY-r",
       "sourceHandle": "2",
-      "target": "audCh1",
-      "targetHandle": null,
-      "id": "reactflow__edge-audCh22-audCh1null",
-      "animated": true,
-      "type": "smoothstep"
+      "target": "audStart01",
+      "targetHandle": null
     },
     {
-      "source": "audCh1",
-      "sourceHandle": "1",
-      "target": "audEns96",
-      "targetHandle": null,
-      "id": "reactflow__edge-audCh11-audEns96null",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audCh1",
+      "id": "force-nochange",
+      "source": "TOqGPovz0",
       "sourceHandle": "2",
-      "target": "audEnsure1",
-      "targetHandle": null,
-      "id": "reactflow__edge-audCh12-audEnsure1null",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audEns192",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "reactflow__edge-audEns1921-audStrip01null",
-      "animated": true,
-      "type": "smoothstep"
-    },
-    {
-      "source": "audEns96",
-      "sourceHandle": "1",
-      "target": "audStrip01",
-      "targetHandle": null,
-      "id": "reactflow__edge-audEns961-audStrip01null",
-      "animated": true,
-      "type": "smoothstep"
+      "target": "gateMkv1",
+      "targetHandle": null
     }
   ],
   "isUiLocked": false

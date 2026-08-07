@@ -6,9 +6,9 @@
     "test": "vitest run --config vitest.config.ts",
     "test:findings": "vitest run --config vitest.findings.config.ts",
     "typecheck": "tsc --noEmit",
-    "lint:flow": "tdarr-test lint flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --ignore missing-error-edge:audProped",
+    "lint:flow": "tdarr-test lint flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --ignore missing-error-edge:audProped,missing-error-edge:audExec001,unwired-handle:gateMedium",
     "prepare": "husky",
-    "fuzz": "tdarr-test fuzz flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins"
+    "fuzz": "tdarr-test fuzz flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --video-only"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

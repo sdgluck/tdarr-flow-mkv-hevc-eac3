@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { probe } from 'tdarr-flow-test';
+import { Flow, probe } from 'tdarr-flow-test';
 
-import { run } from '../support/setup.ts';
+import { paths, run, runOn } from '../support/setup.ts';
+
+/**
+ * The flow this repo ships has since been fixed. The captured logs describe the
+ * flow as it was, so the replay runs against a pinned copy - otherwise the
+ * evidence that the harness matches real Tdarr would be thrown away the moment
+ * the flow changed.
+ */
+const preGuards = Flow.fromFile(paths.preGuardFlow);
 
 /**
  * The findings suite leans on the simulator being a faithful model of how Tdarr
@@ -13,11 +21,11 @@ import { run } from '../support/setup.ts';
  * are fixed.
  */
 describe('simulator fidelity against captured job logs', () => {
-  it('reproduces the truncated MP4 failure (Movie A)', () => {
+  it('reproduces the truncated MP4 failure on the pre-guard flow (Movie A)', () => {
     // Real job: ffprobe returned {}, so Tdarr recorded fileMedium "other",
     // no codecs, and videoStreamIndex -1. The mp4 was missing ~1.26 GiB and
     // its entire moov atom.
-    const result = run(probe.unreadableFile({ container: 'mp4', name: 'movie-a.mp4' }));
+    const result = runOn(preGuards, probe.unreadableFile({ container: 'mp4', name: 'movie-a.mp4' }));
 
     // Both remux attempts ran, and both died at ffmpeg.
     expect(result.didVisit('Remux & Heal Container')).toBe(true);
@@ -41,6 +49,17 @@ describe('simulator fidelity against captured job logs', () => {
     expect(result.replaced).toBe(false);
   });
 
+  it('handles that same truncated MP4 cleanly on the current flow', () => {
+    // The medium gate now catches it at the entry: no remux attempts, no
+    // crash, and - the property that matters most - nothing committed.
+    const result = run(probe.unreadableFile({ container: 'mp4', name: 'movie-a.mp4' }));
+
+    expect(result.halted).toBeNull();
+    expect(result.replaced).toBe(false);
+    expect(result.didVisit('Remux & Heal Container')).toBe(false);
+    expect(result.visited).toEqual(['Input File', 'Readable Video?']);
+  });
+
   it('reproduces the SD .avi success (Show C S09E02)', () => {
     // Real job: mono 22.05 kHz mp3 in an AVI, no subtitles. Took the genpts
     // remux and the mono/96k ladder tier; 25.22 MB -> 21.78 MB.
@@ -58,16 +77,11 @@ describe('simulator fidelity against captured job logs', () => {
 
     expect(result.halted).toBeNull();
 
-    // The ladder must walk 6 -> 8 -> 2 -> 1 and land on mono. Asserted on the
-    // path rather than on log text, which belongs to the plugin, not to us.
-    const ladder = result.path
-      .filter((entry) => entry.plugin === 'checkChannelCount')
+    // Neither surround nor stereo, so it takes the mono tier and stays mono.
+    const route = result.path
+      .filter((entry) => entry.plugin === 'checkStreamProperty')
       .map((entry) => `${entry.name}=${entry.handle}`);
-    expect(ladder).toEqual(['6ch?=2', '8ch?=2', '2ch?=2', '1ch?=1']);
-
-    // The 96k tier asks for 6 channels and relies on the plugin clamping to
-    // what the source actually has. Confirmed against real plugin source.
-    expect(result.messages.some((m) => m.includes('higher than the highest available'))).toBe(true);
+    expect(route).toEqual(['Surround Present?=2', 'Stereo Present?=2']);
 
     // Ends as MKV with exactly one E-AC3 mono track, and commits.
     expect(result.file.container).toBe('mkv');

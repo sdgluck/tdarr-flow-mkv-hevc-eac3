@@ -1,248 +1,130 @@
-# tdarr
-
-Version-controlled Tdarr configuration.
-
-Server: `tdarr-server:8266` (Tdarr 2.86.01), nodes `Nvidia` and `Intel`.
-
-## Layout
-
-```
-flows/      Flow definitions, exported from the Tdarr UI as JSON.
-plugins/    Local plugin source (.js), mirrors the server plugin folder.
-```
-
-## flows/
-
-Flows are not files on the server — they live in SQLite at
-`server/Tdarr/DB2/SQL/database.db`, table `flowsjsondb`, one JSON blob per row.
-(The `DB2/FlowsJSONDB/` folder is an empty leftover from an older storage
-format.) These files are therefore exported artifacts, not a source of truth.
-The round trip is manual:
-
-- **Export**: Flows tab → open the flow → export to JSON → save over the file here.
-- **Import**: Flows tab → import → select the file.
-
-Commit after every meaningful change so the repo stays a usable backup. If a
-flow is edited in the UI and not re-exported, this repo is stale — re-export
-before making changes on disk.
-
-Note the DB row uses a slightly different key set than a UI export: `_id`,
-`name`, `priority`, `flowPlugins`, `flowEdges`, `isUiLocked`, with no
-`description` or `tags`. Edges carry `animated` and `type` fields that the UI
-export strips. `flows/transcode-pipeline.json` is in DB shape and imports fine.
-
-## plugins/
-
-These are real source files. On the server they live under:
-
-- Classic plugins: `/app/server/Tdarr/Plugins/Local/*.js`
-- Flow plugins: `/app/server/Tdarr/Plugins/FlowPlugins/LocalFlowPlugins/<category>/<name>/<version>/index.js`
-
-Copy them in preserving that structure — local flow plugins use the same
-`<category>/<name>/<version>/` layout as `CommunityFlowPlugins`, so the relative
-`require`s are identical: `../../../../FlowHelpers/...` and
-`../../../../../methods/lib`.
-
-Two different consumers resolve these paths, and they fail differently:
-
-- The **server** scans for plugins to populate the editor sidebar. Wrong depth
-  shows up in the server log as
-  `Cannot find module .../<name>/<version>/index.js/index.js` — it walked three
-  levels, ran out, and appended `index.js` to a file.
-- The **node** loads the plugin to run it, from
-  `/app/Tdarr_Node/assets/app/plugins/...`, not from the server directory. Nodes
-  sync their copy from the server, so a newly added local plugin needs a node
-  restart before it can run.
-
-A node-side error like
-`Plugin does not exist: .../LocalFlowPlugins///<name>/<version>/index.js`
-means the **flow node JSON is missing fields**, not that the directory is wrong
-— the empty segments are unpopulated category values. Add the node from the
-editor sidebar rather than hand-writing it into the flow JSON.
-
-Flow plugins are loaded as compiled JavaScript, so the files here are plain JS
-written in the same CommonJS shape the community plugins compile to. Local flow
-plugin nodes reference `"sourceRepo": "Local"` in the flow.
-
-Keep every `require` **inside** the plugin function, never at module top level.
-The UI reads the file to render a node's inputs, and that happens in a context
-where the relative paths to `FlowHelpers` and `methods/lib` do not resolve — a
-top-level require makes the whole module unloadable and the editor shows
-"Unable to read this plugin during loading". Several community plugins
-(`checkAudioCodec`, `checkChannelCount`) follow the same deferred pattern.
-Runtime is unaffected either way, so this fails only in the editor.
-
-Local flow plugins:
-
-- `normaliseAudioTracks` — reduces the audio streams to at most one surround
-  track and one stereo/mono track, preferring the target codec, and puts
-  surround first. No stock plugin can do this: `Drop Incompatible Audio` works
-  by codec so it cannot express "keep two", and `Reorder Streams` only knows
-  8/6/2/1 channels so it mis-sorts a 4-channel track.
-- `keepOneAudioStream` — **no longer used by the flow.** It reduced audio to a
-  single track, which the surround+stereo policy replaced. Left in place in case
-  it is wanted again.
-
-## Deploying a change
-
-Flow edits take effect on import. **Local plugin changes do not** — nodes load
-plugins from their own synced copy at
-`/app/Tdarr_Node/assets/app/plugins/...`, not from the server directory. So a
-new or edited local plugin needs:
-
-1. Copy the file to the server, preserving the directory layout above.
-2. **Restart the Tdarr node**, not just the server. Until you do, the node
-   reports `Plugin does not exist` and the flow fails at that node.
-3. Import the flow: Flows tab → import → `flows/transcode-pipeline.json`.
-
-Verify before a bulk run:
-
-```sh
-pnpm test        # 52 assertions against the real flow and real plugin source
-pnpm lint:flow   # structural lint
-pnpm fuzz        # 8,568 synthetic files through the flow
-```
-
----
-
 # Transcode Pipeline
 
-The single flow (`a_CeSjPzb`), applied to both the TV and Film libraries. Its job: get every file
-to MKV + HEVC video + exactly one English audio track in a directly playable
-codec + English subtitles, in that stream order, with accurate track statistics.
-Audio is left alone wherever it already direct-plays.
+A single Tdarr flow (`a_CeSjPzb`, `flows/transcode-pipeline.json`), applied to
+both the TV and Film libraries.
+
+## Goal
+
+Bring every file in the library to:
+
+- **MKV** container
+- **HEVC** video
+- **English audio only**, in a directly playable codec — at most one surround
+  track and one stereo/mono track, surround first
+- **English subtitles only**, no commentary
+- accurate track statistics tags
+
+Files that already match are left byte-identical, with mtime intact.
 
 ## Stages
 
-**1. Container.** `Remux & Heal Container` runs the local `RemuxMKV` plugin,
-which no-ops when the file is already MKV. On failure the flow falls through
-`Reset Flow Error` → `Force Remux` (`ForceRemuxMKV`), then `Run MKVPropEdit`.
+### 1. Gate
 
-`RemuxMKV` passes `-fflags +genpts`. DivX-packed AVI carries packets with no
-timestamps; without generated timestamps the matroska muxer rejects them
-(`Can't write packet with unknown timestamp`) and writes a truncated stub — on
-one test file, 7 KB and 0.5 s instead of 91 MB and 13 minutes. ffmpeg still
-exits non-zero, so the flow takes the error branch, but the failure is silent
-in the sense that nothing downstream knows the container never converted.
+`Readable Video?` (`fileMedium`) admits video files only. Audio-only files and
+files with no readable media (e.g. a truncated download missing its `moov`
+atom) exit immediately with the library file untouched.
 
-`Force Remux` (`ForceRemuxMKV`) is the escalation, and it accepts **any**
-container. It used to decline anything that was not already Matroska, which
-made it a no-op in exactly the case that needed healing: a failed container
-conversion carried on in its original container with nothing having repaired
-it. That is how one `.avi` reached the audio block still as AVI.
+### 2. Container
 
-It also has to be more permissive than attempt 1, or it just re-runs the same
-command and fails identically — the two presets used to be byte-identical. It
-now adds `+igndts`, much larger `analyzeduration`/`probesize`, `-err_detect
-ignore_err` and `-avoid_negative_ts make_zero` on top of `+genpts`. Still a
-pure stream copy, so nothing is re-encoded and nothing is lost. On an MKV input
-it keeps its original job of rewriting a structurally broken container.
+`Remux & Heal Container` runs the local `RemuxMKV` plugin, which no-ops on a
+file that is already MKV and otherwise stream-copies into Matroska with
+`-fflags +genpts`.
 
-**2. Video.** `Is HEVC?` skips anything already HEVC. Otherwise the flow picks
-an encoder by node name: `Nvidia?` routes to NVENC (`Migz1FFMPEG`), `Intel?` to
-QuickSync (`Boosh_FFMPEG_QSV_HEVC`), and anything else falls back to a CPU
-encode (`Migz1FFMPEG_CPU`) rather than being handed the wrong GPU path.
-`Compare File Size Ratio` then guards the result — if the new file isn't
-smaller, `Set Original File` discards it and the original is kept.
+On failure the flow takes `Reset Flow Error` → `Force Remux` (`ForceRemuxMKV`),
+which accepts any input container and adds `+igndts`, enlarged
+`analyzeduration`/`probesize`, `-err_detect ignore_err` and
+`-avoid_negative_ts make_zero`. Both attempts are pure stream copies; nothing is
+re-encoded. If `Force Remux` also fails, the file continues in its original
+container.
 
-**3. Language cleanup.** `Remove Non English Tracks` (local `CleanTracks`)
-strips non-English audio and subtitles and commentary tracks in a **single
-pass**. It replaces the earlier `CleanAudio` + `CleanSubs` pair, which were two
-separate classic plugins and therefore two full read-and-rewrites of the file -
-on a 30 GB remux, an entire wasted copy. Those two plugins are still in
-`plugins/` but are no longer referenced by the flow.
+Each remux branch is followed by `Run MKVPropEdit`, behind an `Is MKV?`
+(`checkFileExtension`) guard.
 
-It classifies a subtitle as SDH from either the `hearing_impaired` disposition
-flag or an `sdh` in its title, and as commentary from either the `comment`
-disposition flag or a `comment` in its title. The two are kept separate on
-purpose: an earlier version folded the `sdh` title test into the commentary
-test, so `remove_commentary: true` silently deleted SDH tracks and `remove_sdh`
-was never consulted. Most releases label SDH in the title without setting the
-disposition flag, so that path was the one that actually fired.
+### 3. Video
 
-Streams with **no** language tag are kept - an untagged track is far more often
-the main one than a foreign one. And it never strips the last audio stream:
-better a foreign track than a silent file.
+`Is HEVC?` passes HEVC files straight through. Otherwise the encoder is chosen
+by node name:
 
-**4. Audio.** An ffmpeg-command block that plans one command and executes it
-once. Every file ends with **at most two English E-AC3 tracks, surround first**:
+| condition | plugin |
+|---|---|
+| `Nvidia?` | `Migz1FFMPEG` (NVENC) |
+| `Intel?` | `Boosh_FFMPEG_QSV_HEVC` (QuickSync) |
+| otherwise | `Migz1FFMPEG_CPU` |
+
+NVENC and QuickSync fall back to the CPU encoder on error; a CPU failure routes
+through `Reset Flow Error` to `Set Original File`, keeping the source.
+
+`Compare File Size Ratio` guards the output: if the new file is not smaller,
+`Set Original File` discards it.
+
+### 4. Language cleanup
+
+`Remove Non English Tracks` (local `CleanTracks`) removes non-English audio and
+subtitles, commentary tracks, and optionally SDH subtitles — all in a single
+pass over the file.
+
+- Commentary is detected from the `comment` disposition flag or `comment` in the
+  stream title.
+- SDH is detected from the `hearing_impaired` disposition flag or `sdh` in the
+  title. The two tests are independent, gated by `remove_commentary` and
+  `remove_sdh` respectively.
+- Streams with no language tag are kept.
+- The last audio stream is never removed.
+
+### 5. Audio
+
+An ffmpeg-command block that plans one command and executes it once. Result:
 
 | source audio | result |
 |---|---|
-| surround (4-8ch), with or without a stereo track | E-AC3 surround + E-AC3 2.0 |
-| 7.1 | downmixed to 5.1, plus E-AC3 2.0 |
+| surround (4–8ch), with or without stereo | E-AC3 surround + E-AC3 2.0 @192k |
+| 7.1 | downmixed to 5.1, plus E-AC3 2.0 @192k |
 | stereo only | single E-AC3 2.0 @192k |
-| mono only | single E-AC3 1.0 @96k, never upmixed |
-| no English track | left untouched rather than made silent |
+| mono only | single E-AC3 1.0 @96k |
+| no English track | left untouched |
 
-The layout is decided by **channel count alone**. There used to be three
-`checkAudioCodec` gates asking "does the file already have eac3/ac3/aac?", and
-any hit skipped conversion entirely. That is how a file carrying `DTS 5.1 +
-AAC 2.0` ended up as **stereo**: some stream direct-played, so nothing ran, and
-the codec drop then removed the surround track. Which track survived was decided
-by how the release happened to be packaged. Those three gates are gone.
+The layout is decided by channel count alone, not by existing codec.
 
-`Begin Command` snapshots the streams and `Force MKV Container` pins the output
-container - not cosmetic, since `Begin Command` seeds the container from
-whatever the working file currently is, so without it a failed stage-1 remux
-would have the block write E-AC3 into an AVI. Then:
+Nodes, in order:
 
-- `Surround Present?` (`checkStreamProperty` on `channels`, matching `4,5,6,7,8`)
-  decides the shape. `checkChannelCount` could not express this - it matches one
-  exact count - which is why the old design needed a four-node ladder.
-- `Ensure E-AC3 Surround 384k` asks for 6 channels and the plugin clamps to
+- `Begin Command` snapshots the streams.
+- `Force MKV Container` pins the output container (`Begin Command` otherwise
+  seeds it from whatever the working file currently is).
+- `Surround Present?` — `checkStreamProperty` on `channels`, matching
+  `4,5,6,7,8`.
+- `Ensure E-AC3 Surround 384k` requests 6 channels; the plugin clamps to
   `min(wanted, available)`, so 8ch → 5.1, 6ch → 5.1, 4ch → 4ch.
-- `Ensure E-AC3 Stereo 192k` then always runs, producing the stereo mate. On a
-  stereo-only source it is a no-op, because Ensure matches on codec **and**
-  exact channel count.
-- Files with no surround take `Stereo Present?`, and mono-only files fall
-  through to `Ensure E-AC3 Mono 96k`.
+- `Ensure E-AC3 Stereo 192k` always runs on the surround branch and on the
+  `Stereo Present?` branch. It matches on codec **and** exact channel count, so
+  it is a no-op on a stereo-only source that is already E-AC3.
+- `Ensure E-AC3 Mono 96k` handles mono-only files. Mono is never upmixed.
 - `Normalise Audio Tracks` (local plugin) reduces to one surround and one
-  stereo/mono track, preferring E-AC3, then channel count, then bitrate. Ensure
-  only *adds*, so without this the original stereo track would survive beside
-  the freshly generated one.
-- It also **sets the audio order**, putting surround first. `Reorder Streams`
-  cannot: its channel map only knows 8/6/2/1, so a 4-channel track sorts as an
-  empty string and gets pulled behind a stereo one. `Reorder Streams` is now
-  configured for `streamTypes` only.
+  stereo/mono track, preferring E-AC3, then channel count, then bitrate, and
+  sets the audio order with surround first.
+- `Reorder Streams` is configured for `streamTypes` only.
 - `Execute` builds and runs the command. Streams with no output args get
   `-c copy`, so video and subtitles are remuxed, never re-encoded.
 
-The whole block is **idempotent**: on a file that already matches the policy,
-both Ensure nodes report "File already has..." and nothing is re-encoded. This
-matters, because the flow runs repeatedly over the library.
+`Ensure Audio Stream` matches the configured language and falls back to `und`
+for untagged streams, never to "any language" — so a file with no English audio
+has nothing generated and keeps its original track unconverted.
 
-**5. Finalise.** `File Changed?` (stock `checkFileChanged`) compares the working
-file against the original library file — by path *and* by size. If either
-differs, something upstream rewrote the file, so `Run MKVPropEdit` re-stamps
-statistics tags before `Replace Original File`. If nothing changed, the flow
-goes straight to Replace, which also does nothing, and the file is left
-byte-identical with its mtime intact.
+The block is idempotent: on a file that already matches the policy both Ensure
+nodes report "File already has…" and nothing is re-encoded.
 
-Every `Run MKVPropEdit` sits behind an `Is MKV?` (`checkFileExtension`) guard.
-mkvpropedit refuses anything that is not Matroska, and an unguarded call on a
-non-MKV working file fails, sets `flowFailed`, and drags the whole job to a
-`transcodeError` verdict even when the media itself is fine.
+`Execute` has no error edge; an ffmpeg failure fails the job.
 
-The final restamp has **no `err1` edge**. It previously routed to
-`Replace Original File` on the theory that a tagging failure shouldn't discard
-a good transcode — but it cannot distinguish a good transcode from a bad one,
-so it committed whatever the pipeline produced, including results from runs
-that had already failed upstream. A failed flow must leave the library file
-alone; the working copy stays in cache and the job reports the error.
+### 6. Finalise
 
-This gate must key off the **file**, not off `ffmpegCommand.shouldProcess`. An
-earlier version tested that variable, which only reports whether the *audio*
-block did anything. A file that got a video transcode but no audio change —
-the common case, since ~90% of the library already carries a compatible audio
-codec — took the "unchanged" branch and kept the stats from before the encode.
-Such files ended up claiming their original h264 bitrate and byte count while
-actually holding a much smaller HEVC stream.
+`File Changed?` (`checkFileChanged`) compares the working file against the
+original library file by path **and** size.
 
-Because the restamp now happens once at the very end, the two earlier
-`Run MKVPropEdit` nodes on the remux branches are redundant: anything they
-write is invalidated by the video transcode that follows. They are harmless but
-each costs a full file read.
+- Changed → `Run MKVPropEdit` re-stamps statistics tags → `Replace Original
+  File`.
+- Unchanged → straight to `Replace Original File`, which is itself a no-op.
+
+The final `Run MKVPropEdit` has no `err1` edge, so a failed run never commits to
+the library: the working copy stays in cache and the job reports the error.
 
 ## Graph
 
@@ -314,42 +196,42 @@ flowchart TD
     end
 ```
 
-## Known wrinkles
+## Local plugins
 
-- **Enabling the two-track policy means re-encoding essentially the whole
-  library.** Every previously-processed file has exactly one audio track, so all
-  of them need a stereo mate; AC3 and AAC sources become E-AC3 as well. This is
-  a full sweep, not an incremental one.
-- **A stereo mate costs roughly 65 MB per 45-minute episode** at 192k. If every
-  client you use direct-plays E-AC3 5.1, that second track buys nothing.
-- **The three encoder paths use different plugins.** NVENC and CPU use
-  `Migz1FFMPEG` / `Migz1FFMPEG_CPU`; QuickSync uses `Boosh_FFMPEG_QSV_HEVC`.
-  They have different bitrate logic, so output size varies by which node picks
-  up a file. NVENC and QuickSync now fall back to the CPU encoder on failure,
-  and a CPU failure reverts to the original and carries on without a transcode.
-- **`Execute` deliberately has no error edge.** If ffmpeg fails the working file
-  is bad, and every onward path eventually commits it, so failing the job is the
-  only safe outcome. Same reasoning as the final `Run MKVPropEdit`.
-- **Audio-only files are skipped entirely.** `Readable Video?` routes them to a
-  dead end. This is a video pipeline, and the surround+stereo pair makes no
-  sense for a music file.
-- **Unreadable files are skipped, not repaired.** A truncated download whose
-  `moov` atom is missing has no `fileMedium`, so it exits at `Readable Video?`
-  with the library file untouched. Previously it burned two failed remuxes and a
-  transcode attempt before crashing in `Begin Command`, which has no error edge.
-- **A file with no English audio keeps its original track, unconverted.**
-  `Ensure Audio Stream` matches the configured language and then falls back to
-  `und` for untagged streams, but never to "any language", so a French-only file
-  gets nothing generated and `Normalise Audio Tracks` keeps what was there. It
-  is not silent and not lost, but it is not normalised either. Converting those
-  properly needs a custom plugin.
-- **Setting a plugin input to `""` does not mean "unset".** The server's
-  `loadDefaultValues` rewrites an empty string to the plugin's default, so a
-  blank `language` silently reads as `eng`.
-- **The local flow plugins live only in this repo and on the server.** They are
-  not maintained upstream and will not survive a plugin folder wipe.
-- **E-AC3 cannot be bitstreamed over optical/S/PDIF**, which carries only AC3
-  and DTS. Over HDMI/eARC this is a non-issue.
-- **AV1 sources are transcoded to HEVC**, which is backwards efficiency-wise.
-- **Nothing escalates past `Force Remux`.** If the permissive second attempt
-  also fails, the file continues in its original container.
+Classic plugins live at `/app/server/Tdarr/Plugins/Local/*.js`; flow plugins at
+`/app/server/Tdarr/Plugins/FlowPlugins/LocalFlowPlugins/<category>/<name>/<version>/index.js`.
+`plugins/` mirrors that structure.
+
+Used by the flow:
+
+- `RemuxMKV` — stream-copy remux to MKV, no-op if already MKV.
+- `ForceRemuxMKV` — permissive remux, any input container.
+- `CleanTracks` — single-pass removal of non-English / commentary / SDH tracks.
+- `normaliseAudioTracks` — reduce to one surround + one stereo/mono track and
+  set audio order.
+
+Not referenced by the flow, kept in the repo: `CleanAudio`, `CleanSubs`,
+`keepOneAudioStream`.
+
+## Deploying a change
+
+Flow edits take effect on import. Local plugin changes do not — nodes run
+plugins from their own synced copy at `/app/Tdarr_Node/assets/app/plugins/...`.
+
+1. Copy the plugin file to the server, preserving the directory layout.
+2. Restart the Tdarr **node** (not just the server).
+3. Flows tab → import → `flows/transcode-pipeline.json`.
+
+Flows are stored in SQLite at `server/Tdarr/DB2/SQL/database.db`, table
+`flowsjsondb`, one JSON blob per row; `flows/*.json` are exported artifacts.
+Export via Flows tab → open flow → export to JSON.
+
+Verify before a bulk run:
+
+```sh
+pnpm test        # assertions against the real flow and real plugin source
+pnpm lint:flow   # structural lint
+pnpm fuzz        # synthetic files through the flow
+```
+
+Server: `tdarr-server:8266` (Tdarr 2.86.01), nodes `Nvidia` and `Intel`.

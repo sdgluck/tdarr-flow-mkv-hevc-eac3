@@ -173,3 +173,105 @@ describe('video policy', () => {
     expect(result.video[0]?.codec_name).toBe('hevc');
   });
 });
+
+/**
+ * A track flagged `default` that ffmpeg cloned from the source, and a bitrate
+ * larger than the source ever carried. Both come from `Ensure Audio Stream`
+ * deep-copying the stream it converts from, and both are Normalise's to fix.
+ */
+const withDefault = (options: Parameters<typeof probe.audio>[0]) => {
+  const stream = probe.audio(options);
+  return { ...stream, disposition: { ...stream.disposition, default: 1 } };
+};
+
+const defaults = (result: ReturnType<typeof run>) =>
+  result.audio.map((s) => Number(s.disposition?.default ?? 0));
+
+describe('audio policy: default track flag', () => {
+  it('leaves exactly one default audio track', () => {
+    // Two Ensure nodes both clone the source, so both generated tracks inherit
+    // its default flag. Two defaults is a malformed MKV and players disagree
+    // about what to do with it - observed as a refused transcode.
+    const result = run(probe.file({
+      streams: [probe.video({ codec: 'hevc' }), withDefault({ codec: 'aac', channels: 6 })],
+    }));
+
+    expect(result.audio).toHaveLength(2);
+    expect(defaults(result)).toEqual([1, 0]);
+  });
+
+  it('puts the default flag on the surround track, not the stereo mate', () => {
+    const result = run(probe.file({
+      streams: [
+        probe.video({ codec: 'hevc' }),
+        probe.audio({ codec: 'dts', channels: 6 }),
+        withDefault({ codec: 'aac', channels: 2 }),
+      ],
+    }));
+
+    expect(result.audio[0]?.channels).toBe(6);
+    expect(defaults(result)).toEqual([1, 0]);
+  });
+
+  it('flags the only track as default when there is just one', () => {
+    const result = run(probe.file({
+      streams: [probe.video({ codec: 'hevc' }), probe.audio({ codec: 'aac', channels: 2 })],
+    }));
+
+    expect(defaults(result)).toEqual([1]);
+  });
+
+  it('does not rewrite a file whose flags are already right', () => {
+    // Otherwise every pass over an already-correct library rewrites every file.
+    const result = run(probe.file({
+      container: 'mkv',
+      streams: [
+        probe.video({ codec: 'hevc' }),
+        withDefault({ codec: 'eac3', channels: 6 }),
+        probe.audio({ codec: 'eac3', channels: 2 }),
+      ],
+    }));
+
+    expect(defaults(result)).toEqual([1, 0]);
+    expect(
+      result.messages.some((m) => /No need to process file/.test(m)),
+      'a compliant file was rewritten',
+    ).toBe(true);
+  });
+});
+
+describe('audio policy: bitrate cap', () => {
+  const bitrates = (source: ReturnType<typeof probe.audio>) =>
+    run(probe.file({ streams: [probe.video({ codec: 'hevc' }), source] }))
+      .audio.map((s) => Number(s.bit_rate ?? 0) / 1000);
+
+  it('caps a track at what its source actually carried', () => {
+    // The Show E case: 197kbps of HE-AAC re-encoded to 384k + 192k grew a 633MB
+    // file to 801MB, spending 2.9x the bitrate to carry less information.
+    expect(bitrates(probe.audio({ codec: 'aac', channels: 6, bitRate: 196_900 })))
+      .toEqual([192, 192]);
+  });
+
+  it('reads the source bitrate from the BPS tag when ffprobe omits bit_rate', () => {
+    // Matroska is the common case and it rarely fills bit_rate in.
+    const source = probe.audio({ codec: 'aac', channels: 6 });
+    const tagged = { ...source, tags: { ...source.tags, BPS: '196900' } };
+    expect(bitrates(tagged)).toEqual([192, 192]);
+  });
+
+  it('leaves the configured bitrate alone when the source is fatter', () => {
+    expect(bitrates(probe.audio({ codec: 'dts', channels: 6, bitRate: 1_500_000 })))
+      .toEqual([384, 192]);
+  });
+
+  it('leaves the configured bitrate alone when the source bitrate is unknown', () => {
+    // No bit_rate and no BPS tag. Guessing low would quietly degrade the audio.
+    expect(bitrates(probe.audio({ codec: 'dts', channels: 6 }))).toEqual([384, 192]);
+  });
+
+  it('never caps below the floor, however thin the source', () => {
+    // A 48kbps source is not a reason to encode 5.1 E-AC3 at 32k.
+    expect(bitrates(probe.audio({ codec: 'aac', channels: 6, bitRate: 48_000 })))
+      .toEqual([128, 128]);
+  });
+});

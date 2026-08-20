@@ -6,7 +6,8 @@ var details = function () { return ({
     description: 'Reduce the audio streams to at most one surround track and one stereo/mono '
         + 'track, preferring the target codec. Replaces the drop/keep-one pair: those could not '
         + 'express "keep two", and dropping by codec alone left the original stereo track '
-        + 'alongside a freshly generated one. Never leaves the file with no audio.',
+        + 'alongside a freshly generated one. Never leaves the file with no audio. Also owns '
+        + 'the kept tracks\' default flags and caps their bitrate at what the source carried.',
     style: {
         borderColor: '#6efefc',
     },
@@ -36,6 +37,17 @@ var details = function () { return ({
                 type: 'text',
             },
             tooltip: 'Streams with at least this many channels count as surround.',
+        },
+        {
+            label: 'Bitrate Floor',
+            name: 'bitrateFloor',
+            type: 'string',
+            defaultValue: '128k',
+            inputUI: {
+                type: 'text',
+            },
+            tooltip: 'A track is never capped below this, however thin its source. '
+                + 'Set to 0 to disable the cap entirely.',
         },
     ],
     outputs: [
@@ -82,12 +94,13 @@ var pickBest = function (candidates, isBetter) {
 // This rewrites each kept stream's args to: one entry per option, last value
 // wins, and per-stream specifiers on the ones that need them.
 var UNQUALIFIED_PER_STREAM_OPTS = ['-ac', '-ar'];
+var baseFlag = function (flag) { return String(flag).split(':')[0]; };
 var qualifyOutputArgs = function (args) {
     var order = [];
     var latest = {};
     for (var i = 0; i < args.length - 1; i += 2) {
         var flag = String(args[i]);
-        var base = flag.split(':')[0];
+        var base = baseFlag(flag);
         if (order.indexOf(base) === -1) {
             order.push(base);
         }
@@ -104,6 +117,100 @@ var qualifyOutputArgs = function (args) {
     }
     return out;
 };
+// Bitrate is configured on the Ensure nodes as a flat number, which is right
+// for a fat source and wasteful for a thin one: a 197kbps HE-AAC web-rip re-encoded
+// to E-AC3 384k + 192k grew a 633MB file to 801MB, spending 2.9x the bitrate to
+// carry strictly less information than the source had. Cap at what was actually
+// there, rounded down to a sane E-AC3 step, never below the floor.
+var BITRATE_STEP_KBPS = 32;
+var parseKbps = function (value) {
+    var match = /^(\d+)k?$/i.exec(String(value).trim());
+    return match ? Number(match[1]) : null;
+};
+// What the source carried. Matroska rarely fills ffprobe's bit_rate, so the BPS
+// tag mkvmerge and mkvpropedit write is usually the only answer available.
+var sourceKbps = function (stream) {
+    var direct = Number(stream.bit_rate || 0);
+    if (direct > 0) {
+        return direct / 1000;
+    }
+    var tags = stream.tags || {};
+    var bps = Number(tags.BPS || tags.bps || 0);
+    return bps > 0 ? bps / 1000 : null;
+};
+// Rewrites the surviving "-b:a:..." value in place. Returns the bitrate the
+// stream will actually be encoded at, or null if it is not being encoded.
+var capBitrate = function (stream, floorKbps, log) {
+    var args = stream.outputArgs || [];
+    var effective = null;
+    for (var i = 0; i < args.length - 1; i += 2) {
+        if (baseFlag(args[i]) !== '-b') {
+            continue;
+        }
+        var requested = parseKbps(args[i + 1]);
+        if (requested === null) {
+            continue;
+        }
+        effective = requested;
+        var source = sourceKbps(stream);
+        if (floorKbps <= 0 || source === null || source >= requested) {
+            continue;
+        }
+        var stepped = Math.floor(source / BITRATE_STEP_KBPS) * BITRATE_STEP_KBPS;
+        var capped = Math.min(requested, Math.max(floorKbps, stepped));
+        if (capped < requested) {
+            args[i + 1] = capped + 'k';
+            effective = capped;
+            log("Capped index ".concat(stream.index, " from ").concat(requested, "k to ")
+                .concat(capped, "k; the source carried ").concat(Math.round(source), "k \n"));
+        }
+    }
+    return effective;
+};
+// "Ensure Audio Stream" builds a track by deep-cloning the source stream, so
+// every generated track inherits the source's default flag. Two Ensure nodes
+// therefore produce two tracks both flagged default, which is a malformed MKV -
+// the spec allows one default per track type - and players disagree about what
+// to do with it. Observed for real: a file Plex refused to transcode.
+//
+// ffmpeg copies dispositions from the input stream unless told otherwise, so
+// fixing the planned stream alone changes nothing in the output file. The
+// "-disposition" arg is what actually lands.
+var DISPOSITION_FLAG = '-disposition:{outputIndex}';
+var COPY_ARGS = ['-c:{outputIndex}', 'copy'];
+var hasCodecArg = function (args) {
+    for (var i = 0; i < args.length - 1; i += 2) {
+        if (/^-(c|codec)(:|$)/.test(String(args[i]))) {
+            return true;
+        }
+    }
+    return false;
+};
+var applyDisposition = function (stream, wantDefault) {
+    var args = stream.outputArgs || [];
+    var kept = [];
+    for (var i = 0; i < args.length - 1; i += 2) {
+        if (baseFlag(args[i]) === '-disposition') {
+            continue;
+        }
+        kept.push(args[i], args[i + 1]);
+    }
+    // A pass-through stream has no args at all, and Execute only adds "-c copy"
+    // for a stream whose args are empty or disposition/metadata-only. That
+    // carve-out is a property of one Execute version; say "copy" explicitly so
+    // adding a disposition can never turn a remux into a re-encode.
+    if (!hasCodecArg(kept)) {
+        kept = COPY_ARGS.concat(kept);
+    }
+    kept.push(DISPOSITION_FLAG, wantDefault ? 'default' : '0');
+    // eslint-disable-next-line no-param-reassign
+    stream.outputArgs = kept;
+    // eslint-disable-next-line no-param-reassign
+    stream.disposition = Object.assign({}, stream.disposition, { default: wantDefault ? 1 : 0 });
+};
+var isDefault = function (stream) {
+    return Number((stream.disposition || {}).default || 0) === 1;
+};
 var describe = function (stream) {
     var lang = (stream.tags && stream.tags.language) || 'untagged';
     return "index ".concat(stream.index, " (").concat(stream.codec_name, ", ")
@@ -118,6 +225,7 @@ var plugin = function (args) {
     (0, flowUtils_1.checkFfmpegCommandInit)(args);
     var targetCodec = String(args.inputs.targetCodec);
     var surroundMin = Number(args.inputs.surroundMinChannels);
+    var floorKbps = parseKbps(args.inputs.bitrateFloor) || 0;
     var isBetter = makeIsBetter(targetCodec);
     var streams = args.variables.ffmpegCommand.streams;
     var audioStreams = streams.filter(function (stream) {
@@ -166,6 +274,13 @@ var plugin = function (args) {
                     .concat(before, " -> ").concat(after, " \n"));
             }
         }
+        var encodedAt = capBitrate(stream, floorKbps, args.jobLog);
+        if (encodedAt !== null) {
+            // Keep the planned stream honest: until now it carried the *source*
+            // bitrate it was cloned from, which misleads every later comparison.
+            // eslint-disable-next-line no-param-reassign
+            stream.bit_rate = String(encodedAt * 1000);
+        }
     });
     var removed = 0;
     audioStreams.forEach(function (stream) {
@@ -177,6 +292,21 @@ var plugin = function (args) {
         }
     });
     if (removed > 0) {
+        // eslint-disable-next-line no-param-reassign
+        args.variables.ffmpegCommand.shouldProcess = true;
+    }
+    // Exactly one default audio track, and it is the one listed first. Only
+    // touch the command when the file does not already say so, or every pass
+    // over an already-correct library would rewrite every file.
+    var dispositionWrong = keep.some(function (stream, index) {
+        return isDefault(stream) !== (index === 0);
+    });
+    if (dispositionWrong) {
+        keep.forEach(function (stream, index) {
+            applyDisposition(stream, index === 0);
+        });
+        args.jobLog("Default audio flag set on index ".concat(keep[0].index, " and cleared on ")
+            .concat(keep.length > 1 ? "index ".concat(keep[1].index) : 'nothing else', " \n"));
         // eslint-disable-next-line no-param-reassign
         args.variables.ffmpegCommand.shouldProcess = true;
     }

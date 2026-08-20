@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadClassicPlugin, probe } from 'tdarr-flow-test';
+import { loadClassicPlugin, loadFlowPlugin, probe } from 'tdarr-flow-test';
 import type { ClassicPluginInputs, TdarrFile } from 'tdarr-flow-test';
 
 import { paths } from '../support/setup.ts';
@@ -182,5 +182,111 @@ describe('CleanTracks', () => {
       streams: [probe.video(), probe.audio(), probe.subtitle({ commentary: true })],
     });
     expect(call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).preset).toContain('-map -0:2');
+  });
+});
+
+/**
+ * Normalise Audio Tracks, driven directly. The simulator asserts the *effect*
+ * on the output streams; these assert the ffmpeg arguments that produce it,
+ * which is the half that decides what the real file looks like.
+ */
+const normalise = (
+  streams: Record<string, unknown>[],
+  inputs: Record<string, string> = {},
+) => {
+  const command = {
+    init: true,
+    inputFiles: [],
+    streams: streams.map((s, index) => ({
+      index,
+      codec_type: 'audio',
+      removed: false,
+      inputArgs: [],
+      outputArgs: [],
+      disposition: {},
+      tags: { language: 'eng' },
+      ...s,
+    })),
+    container: 'mkv',
+    hardwareDecoding: false,
+    shouldProcess: false,
+    overallInputArguments: [],
+    overallOuputArguments: [],
+  };
+  const messages: string[] = [];
+  loadFlowPlugin('normaliseAudioTracks', {
+    dir: paths.flowPluginDir,
+    category: 'audio',
+  }).plugin({
+    inputs,
+    variables: { ffmpegCommand: command },
+    inputFileObj: probe.file({ streams: [] }),
+    jobLog: (line: string) => messages.push(line),
+  } as never);
+
+  return { command, messages, kept: command.streams.filter((s) => !s.removed) };
+};
+
+describe('normaliseAudioTracks arguments', () => {
+  it('emits -disposition, because ffmpeg copies the flag from the input otherwise', () => {
+    // Both generated tracks are mapped from the same default-flagged source
+    // stream, so fixing the planned stream alone changes nothing in the file.
+    const { kept } = normalise([
+      { codec_name: 'eac3', channels: 6, disposition: { default: 1 }, outputArgs: ['-c:{outputIndex}', 'eac3'] },
+      { codec_name: 'eac3', channels: 2, disposition: { default: 1 }, outputArgs: ['-c:{outputIndex}', 'eac3'] },
+    ]);
+
+    expect(kept[0]?.outputArgs.join(' ')).toContain('-disposition:{outputIndex} default');
+    expect(kept[1]?.outputArgs.join(' ')).toContain('-disposition:{outputIndex} 0');
+  });
+
+  it('keeps "copy" explicit on a pass-through track it flags', () => {
+    // Execute only supplies "-c copy" for a stream whose args are empty or
+    // disposition-only. That carve-out belongs to one Execute version; without
+    // saying copy ourselves, adding a disposition could turn a remux into a
+    // re-encode at ffmpeg's default codec.
+    const { kept } = normalise([
+      { codec_name: 'eac3', channels: 6, disposition: { default: 0 } },
+    ]);
+
+    expect(kept[0]?.outputArgs.join(' '))
+      .toBe('-c:{outputIndex} copy -disposition:{outputIndex} default');
+  });
+
+  it('leaves the command alone when the flags are already right', () => {
+    const { command } = normalise([
+      { codec_name: 'eac3', channels: 6, disposition: { default: 1 } },
+      { codec_name: 'eac3', channels: 2, disposition: { default: 0 } },
+    ]);
+
+    expect(command.shouldProcess, 'a compliant file was queued for a rewrite').toBe(false);
+    expect(command.streams.every((s) => s.outputArgs.length === 0)).toBe(true);
+  });
+
+  it('caps the bitrate arg at the source BPS tag', () => {
+    const { kept, messages } = normalise([
+      {
+        codec_name: 'eac3',
+        channels: 6,
+        tags: { language: 'eng', BPS: '196900' },
+        outputArgs: ['-c:{outputIndex}', 'eac3', '-b:a:{outputTypeIndex}', '384k'],
+      },
+    ]);
+
+    expect(kept[0]?.outputArgs.join(' ')).toContain('-b:a:{outputTypeIndex} 192k');
+    expect(messages.join('')).toContain('the source carried 197k');
+  });
+
+  it('does not touch a bitrate the source can justify', () => {
+    const { kept } = normalise([
+      {
+        codec_name: 'eac3',
+        channels: 6,
+        bit_rate: '1500000',
+        outputArgs: ['-c:{outputIndex}', 'eac3', '-b:a:{outputTypeIndex}', '384k'],
+      },
+    ]);
+
+    expect(kept[0]?.outputArgs.join(' ')).toContain('-b:a:{outputTypeIndex} 384k');
   });
 });

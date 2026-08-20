@@ -75,7 +75,9 @@ An ffmpeg-command block that plans one command and executes it once. Result:
 | mono only                                | single E-AC3 1.0 @96k                  |
 | no English track                         | left untouched                         |
 
-The layout is decided by channel count alone, not by existing codec.
+The layout is decided by channel count alone, not by existing codec. Bitrates
+are ceilings, not targets: a track is never encoded above what its source
+carried. Exactly one track comes out flagged `default`, and it is the first.
 
 Nodes, in order:
 
@@ -92,7 +94,20 @@ Nodes, in order:
 - `Ensure E-AC3 Mono 96k` handles mono-only files. Mono is never upmixed.
 - `Normalise Audio Tracks` (local plugin) reduces to one surround and one
   stereo/mono track, preferring E-AC3, then channel count, then bitrate, and
-  sets the audio order with surround first.
+  sets the audio order with surround first. It also owns two things `Ensure`
+  gets wrong, because `Ensure` builds a track by deep-cloning the stream it
+  converts from:
+  - **The default flag.** Every generated track inherits the source's, so two
+    `Ensure` nodes produce two tracks both flagged `default` — a malformed MKV,
+    and one Plex refused to transcode. Normalise emits `-disposition`, without
+    which ffmpeg copies the flag from the input regardless of what the planned
+    stream says.
+  - **The bitrate.** `Ensure` asks for a flat 384k/192k however little the
+    source carried. A 197kbps HE-AAC web-rip re-encoded to both grew a 633MB
+    file to 801MB. Normalise caps each track at the source's own bitrate —
+    read from `bit_rate`, else the `BPS` tag, since Matroska rarely fills the
+    former — rounded down to a 32k step and never below `Bitrate Floor`
+    (128k). An unknown source bitrate is never guessed at.
 - `Reorder Streams` is configured for `streamTypes` only.
 - `Execute` builds and runs the command. Streams with no output args get
   `-c copy`, so video and subtitles are remuxed, never re-encoded.
@@ -102,7 +117,9 @@ for untagged streams, never to "any language" — so a file with no English audi
 has nothing generated and keeps its original track unconverted.
 
 The block is idempotent: on a file that already matches the policy both Ensure
-nodes report "File already has…" and nothing is re-encoded.
+nodes report "File already has…" and nothing is re-encoded. Files produced
+before the default-flag fix are the exception — they are rewritten once, as a
+stream copy, to correct their flags, and are stable from then on.
 
 `Execute` has no error edge; an ffmpeg failure fails the job.
 

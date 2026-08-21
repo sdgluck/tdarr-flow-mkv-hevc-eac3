@@ -104,6 +104,38 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     }
   });
 
+  // Exactly one subtitle track survives. Two English text tracks are
+  // indistinguishable to a player whenever the source flags neither: Show B
+  // S03E08 labelled its SDH track in the title only, so both came out as plain
+  // eng/subrip and Plex's subtitle selector matched both. Its SRT output cannot
+  // represent that -- "srt muxer does not support more than one stream of type
+  // subtitle" -- and the session dies with "Conversion failed". One track makes
+  // that impossible for any selector, not just the one Plex happened to use.
+  //
+  // Collapsing here is free: this pass is already a stream copy over the file.
+  const keptSubs = subtitleStreams.filter(s => !subsToRemove.includes(s.index));
+  if (keptSubs.length > 1) {
+    // A forced track carries foreign dialogue only, so it is the worst possible
+    // sole subtitle. SDH is a full transcript and merely noisy. Lower is better;
+    // ties fall through to the earlier stream in the file.
+    const rank = stream => {
+      const title = (stream.tags?.title || '').toLowerCase();
+      const isSDH = stream.disposition?.hearing_impaired === 1 || title.includes('sdh');
+      const isForced = stream.disposition?.forced === 1 || title.includes('forced');
+      return (isForced ? 2 : 0) + (isSDH ? 1 : 0);
+    };
+    let best = keptSubs[0];
+    keptSubs.forEach(stream => {
+      if (rank(stream) < rank(best)) best = stream;
+    });
+    keptSubs.forEach(stream => {
+      if (stream.index === best.index) return;
+      subsToRemove.push(stream.index);
+      response.infoLog += `☒ Removing surplus subtitle stream ${stream.index}; `
+        + `keeping ${best.index} as the only subtitle track.\n`;
+    });
+  }
+
   const streamsToRemove = audioToRemove.concat(subsToRemove);
   if (streamsToRemove.length === 0) {
     response.processFile = false;

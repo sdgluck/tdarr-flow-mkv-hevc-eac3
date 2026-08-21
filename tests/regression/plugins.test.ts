@@ -183,6 +183,86 @@ describe('CleanTracks', () => {
     });
     expect(call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).preset).toContain('-map -0:2');
   });
+
+  // Two English text tracks with nothing to tell them apart is what killed the
+  // Show B S03E08 Plex session: "srt muxer does not support more than one stream
+  // of type subtitle". Exactly one track survives, so no selector can match two.
+  it('collapses two English subtitles to one, keeping the plain track', () => {
+    const file = probe.file({
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.subtitle({ title: 'English' }),
+        probe.subtitle({ title: 'English [SDH]' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.processFile).toBe(true);
+    expect(result.preset).toContain('-map -0:3');
+    expect(result.preset).not.toContain('-map -0:2');
+  });
+
+  it('collapses on the SDH disposition too, not just the title', () => {
+    const file = probe.file({
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.subtitle({ hearingImpaired: true }),
+        probe.subtitle({ title: 'English' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.preset).toContain('-map -0:2');
+    expect(result.preset).not.toContain('-map -0:3');
+  });
+
+  it('keeps a full transcript over a forced track', () => {
+    // Forced carries foreign dialogue only: the worst possible sole subtitle.
+    const file = probe.file({
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.subtitle({ title: 'English (Forced)' }),
+        probe.subtitle({ title: 'English [SDH]' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.preset).toContain('-map -0:2');
+    expect(result.preset).not.toContain('-map -0:3');
+  });
+
+  it('keeps SDH when it is the only English subtitle', () => {
+    const file = probe.file({
+      streams: [probe.video(), probe.audio(), probe.subtitle({ title: 'English [SDH]' })],
+    });
+    expect(call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).processFile).toBe(false);
+  });
+
+  it('leaves a compliant single-subtitle file alone', () => {
+    const file = probe.file({
+      streams: [probe.video(), probe.audio({ language: 'eng' }), probe.subtitle({ language: 'eng' })],
+    });
+    expect(call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).processFile).toBe(false);
+  });
+
+  it('counts only the survivors, not tracks it already dropped', () => {
+    // A foreign sub alongside one English sub must not look like "two kept".
+    const file = probe.file({
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.subtitle({ language: 'eng' }),
+        probe.subtitle({ language: 'fre' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.preset).toContain('-map -0:3');
+    expect(result.preset).not.toContain('-map -0:2');
+  });
 });
 
 /**
@@ -288,5 +368,32 @@ describe('normaliseAudioTracks arguments', () => {
     ]);
 
     expect(kept[0]?.outputArgs.join(' ')).toContain('-b:a:{outputTypeIndex} 384k');
+  });
+
+  // E-AC3's 256 samples of encoder delay become a Matroska CodecDelay, and a
+  // reader reports the first packet at -0.005s unless the muxer shifted the
+  // file to compensate. ffmpeg's default "auto" shifts only when it decides it
+  // must, so it lands intermittently: Show B S03E07 came out clean, S03E08 with
+  // its stereo track negative.
+  it('pins the timestamp origin when it is rewriting the file', () => {
+    const { command } = normalise([
+      { codec_name: 'eac3', channels: 6, disposition: { default: 1 }, outputArgs: ['-c:{outputIndex}', 'eac3'] },
+      { codec_name: 'eac3', channels: 2, disposition: { default: 1 }, outputArgs: ['-c:{outputIndex}', 'eac3'] },
+    ]);
+
+    expect(command.overallOuputArguments.join(' ')).toBe('-avoid_negative_ts make_zero');
+  });
+
+  it('adds no overall argument to a compliant file', () => {
+    // Execute forces shouldProcess whenever overallOuputArguments is non-empty,
+    // so an unconditional mux argument would rewrite the whole library on every
+    // pass, for ever.
+    const { command } = normalise([
+      { codec_name: 'eac3', channels: 6, disposition: { default: 1 } },
+      { codec_name: 'eac3', channels: 2, disposition: { default: 0 } },
+    ]);
+
+    expect(command.overallOuputArguments).toEqual([]);
+    expect(command.shouldProcess, 'a compliant file was queued for a rewrite').toBe(false);
   });
 });

@@ -328,6 +328,26 @@ var plugin = function (args) {
             args.variables.ffmpegCommand.shouldProcess = true;
         }
     }
+    // E-AC3 carries 256 samples of encoder delay. The Matroska muxer records
+    // that as CodecDelay and a reader reports the first packet at -0.005s,
+    // unless the muxer shifted the whole file to compensate. ffmpeg's default
+    // "-avoid_negative_ts auto" shifts only when it decides it must, so the
+    // outcome varies with interleaving rather than with the input: Show B S03E07
+    // came out with every stream at >= 0, S03E08 with its stereo track at
+    // -0.005. A negative start upsets seeking and some transcoders outright.
+    // Pin it instead of hoping.
+    //
+    // Only when something is being rewritten anyway. Execute sets shouldProcess
+    // whenever overallOuputArguments is non-empty, so adding this
+    // unconditionally would rewrite every file in the library on every pass,
+    // for ever.
+    if (args.variables.ffmpegCommand.shouldProcess) {
+        var overall = args.variables.ffmpegCommand.overallOuputArguments;
+        if (overall.indexOf('-avoid_negative_ts') === -1) {
+            overall.push('-avoid_negative_ts', 'make_zero');
+            args.jobLog('Pinned the output timestamp origin to zero \n');
+        }
+    }
     return {
         outputFileObj: args.inputFileObj,
         outputNumber: 1,

@@ -4,7 +4,7 @@
 - **HEVC** video
 - **English audio only**, directly playable codec
 - At most one surround track and one stereo/mono track, surround first
-- **English subtitles only**, no commentary
+- **Exactly one English subtitle track**, no commentary
 - Accurate track statistics tags
 - Files that already match are left alone
 
@@ -62,6 +62,25 @@ pass over the file.
   `remove_sdh` respectively.
 - Streams with no language tag are kept.
 - The last audio stream is never removed.
+- **At most one subtitle track survives.** Where several English tracks remain,
+  it keeps the plain one, preferring a full transcript over SDH and SDH over a
+  forced track, and drops the rest in the same pass.
+
+  Two English text tracks are indistinguishable to a player whenever the source
+  flags neither. Show B S03E08 labelled its SDH track in the title only, so both
+  came out as plain `eng`/`subrip` with nothing but `default` between them,
+  Plex's subtitle selector matched both, and its SRT output cannot represent
+  that:
+
+  ```
+  [srt] SRT supports only a single subtitles stream
+  [TranscodeOutputStream] Session appears to have died from under us
+  ```
+
+  Writing the missing `hearing_impaired` flag would have fixed that one
+  selector. Keeping one track makes the failure unreachable for any selector.
+  SDH still survives when it is the *only* English subtitle — the goal is one
+  track, not "no SDH".
 
 ### 5. Audio
 
@@ -108,6 +127,16 @@ Nodes, in order:
     read from `bit_rate`, else the `BPS` tag, since Matroska rarely fills the
     former — rounded down to a 32k step and never below `Bitrate Floor`
     (128k). An unknown source bitrate is never guessed at.
+  - **The timestamp origin.** E-AC3 carries 256 samples of encoder delay, which
+    Matroska records as `CodecDelay` and readers report as a first packet at
+    `-0.005s` unless the muxer shifted the file to compensate. ffmpeg's default
+    `-avoid_negative_ts auto` shifts only when it decides it must, so the
+    outcome tracks interleaving rather than input: S03E07 came out with every
+    stream at `>= 0`, S03E08 with its stereo track negative. Normalise pins
+    `-avoid_negative_ts make_zero` — but only when the command is rewriting the
+    file anyway, because `Execute` forces `shouldProcess` whenever
+    `overallOuputArguments` is non-empty, and an unconditional argument would
+    rewrite the whole library on every pass.
 - `Reorder Streams` is configured for `streamTypes` only.
 - `Execute` builds and runs the command. Streams with no output args get
   `-c copy`, so video and subtitles are remuxed, never re-encoded.

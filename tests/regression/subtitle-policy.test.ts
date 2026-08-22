@@ -69,6 +69,30 @@ describe('subtitle policy: at most one track', () => {
     expect(result[0]?.tags?.title).toBe('English [SDH]');
   });
 
+  it('keeps text over an image track, which Plex would have to burn in', () => {
+    // PGS/VOBSUB cannot be delivered to a client as text, so keeping one forces
+    // a full video transcode - the session that was failing to begin with.
+    const result = subtitles([
+      probe.subtitle({ codec: 'hdmv_pgs_subtitle', language: 'eng' }),
+      probe.subtitle({ codec: 'subrip', language: 'eng' }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.codec_name).toBe('subrip');
+  });
+
+  it('keeps a full image transcript over a forced text track', () => {
+    // Forced covers foreign dialogue only, so as the sole track it leaves most
+    // of the dialogue uncovered. Burn-in beats missing most of the words.
+    const result = subtitles([
+      probe.subtitle({ codec: 'subrip', language: 'eng', title: 'English (Forced)' }),
+      probe.subtitle({ codec: 'hdmv_pgs_subtitle', language: 'eng' }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.codec_name).toBe('hdmv_pgs_subtitle');
+  });
+
   it('leaves a file with no subtitles alone', () => {
     expect(subtitles([])).toHaveLength(0);
   });

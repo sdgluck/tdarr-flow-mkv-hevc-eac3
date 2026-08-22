@@ -115,14 +115,21 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   // Collapsing here is free: this pass is already a stream copy over the file.
   const keptSubs = subtitleStreams.filter(s => !subsToRemove.includes(s.index));
   if (keptSubs.length > 1) {
-    // A forced track carries foreign dialogue only, so it is the worst possible
-    // sole subtitle. SDH is a full transcript and merely noisy. Lower is better;
-    // ties fall through to the earlier stream in the file.
+    // Lower is better; ties fall through to the earlier stream in the file.
+    //
+    //   forced  worst: it carries foreign dialogue only, so as the SOLE track it
+    //           leaves most of the dialogue uncovered.
+    //   image   complete, but PGS/VOBSUB cannot be handed to a client as text,
+    //           so Plex must burn it into the video - a full transcode, which is
+    //           the session that was failing in the first place.
+    //   SDH     complete and text; merely noisy.
+    const IMAGE_SUB_CODECS = ['hdmv_pgs_subtitle', 'dvd_subtitle', 'dvb_subtitle', 'xsub'];
     const rank = stream => {
       const title = (stream.tags?.title || '').toLowerCase();
       const isSDH = stream.disposition?.hearing_impaired === 1 || title.includes('sdh');
       const isForced = stream.disposition?.forced === 1 || title.includes('forced');
-      return (isForced ? 2 : 0) + (isSDH ? 1 : 0);
+      const isImage = IMAGE_SUB_CODECS.includes(stream.codec_name);
+      return (isForced ? 4 : 0) + (isImage ? 2 : 0) + (isSDH ? 1 : 0);
     };
     let best = keptSubs[0];
     keptSubs.forEach(stream => {

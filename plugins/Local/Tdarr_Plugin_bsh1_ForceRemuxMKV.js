@@ -1,4 +1,47 @@
 /* eslint-disable */
+// mov_text (tx3g) is MP4-only: Matroska cannot carry it. Dropping every
+// subtitle the moment one appeared - which is what this used to do - threw away
+// perfectly good SRT tracks standing beside it. Keep everything MKV can hold,
+// and convert mov_text to SRT only when nothing else already carries the
+// dialogue as text. Text to text, so nothing is lost.
+const TEXT_SUB_CODECS = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'text', 'mov_text'];
+
+const planSubtitles = (streams) => {
+  const subs = streams.filter(s => s.codec_type === 'subtitle');
+  if (subs.length === 0) {
+    return { args: '', log: '' };
+  }
+
+  const movText = subs.filter(s => s.codec_name === 'mov_text');
+  if (movText.length === 0) {
+    return { args: '-map 0:s?', log: '' };
+  }
+
+  // Another text track already carries the dialogue, so the mov_text one adds
+  // nothing worth a conversion.
+  const hasOtherText = subs.some(s => s.codec_name !== 'mov_text'
+    && TEXT_SUB_CODECS.includes(s.codec_name));
+  const kept = hasOtherText ? subs.filter(s => s.codec_name !== 'mov_text') : subs;
+
+  // Mapped one by one rather than with "0:s?", because "-c:s:N" counts N among
+  // the subtitle OUTPUT streams: the conversion has to name the right one.
+  const mapArgs = [];
+  const codecArgs = [];
+  kept.forEach((stream, n) => {
+    mapArgs.push(`-map 0:${stream.index}`);
+    if (stream.codec_name === 'mov_text') {
+      codecArgs.push(`-c:s:${n} srt`);
+    }
+  });
+
+  const log = hasOtherText
+    ? `\u2612 Dropping ${movText.length} mov_text subtitle(s); MKV cannot carry them and `
+      + 'other text subtitles remain.\n'
+    : `\u2612 Converting ${movText.length} mov_text subtitle(s) to SRT; MKV cannot carry mov_text.\n`;
+
+  return { args: [...mapArgs, ...codecArgs].join(' '), log };
+};
+
 const details = () => ({
   id: 'Tdarr_Plugin_bsh1_ForceRemuxMKV',
   Stage: 'Pre-processing',
@@ -48,16 +91,11 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     + '-err_detect ignore_err';
 
   // 0:V:0 (uppercase V) excludes attached pictures
-  // mov_text (tx3g) is MP4-only and unsupported in MKV - drop those subs
   const streams = file.ffProbeData?.streams ?? [];
-  const hasMovText = streams.some(s => s.codec_type === 'subtitle' && s.codec_name === 'mov_text');
-  const subMap = hasMovText ? '' : '-map 0:s?';
+  const subPlan = planSubtitles(streams);
+  response.infoLog += subPlan.log;
 
-  if (hasMovText) {
-    response.infoLog += '☒ Dropping mov_text subtitles (MP4-only, incompatible with MKV).\n';
-  }
-
-  response.preset = `${inputArgs}, -map 0:V:0 -map 0:a? ${subMap} -c copy `
+  response.preset = `${inputArgs}, -map 0:V:0 -map 0:a? ${subPlan.args} -c copy `
     + '-max_muxing_queue_size 9999 -avoid_negative_ts make_zero';
 
   return response;

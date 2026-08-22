@@ -275,3 +275,28 @@ describe('audio policy: bitrate cap', () => {
       .toEqual([128, 128]);
   });
 });
+
+/**
+ * The transcode output guard. This used to be one-sided: `greaterThan: 0` meant
+ * the "smaller than lower bound" output could never fire, and it was wired to
+ * accept anyway, so an encoder that exited 0 having written a truncated file
+ * overwrote the source. Confirmed at the time: a 0.1% output replaced the
+ * library file.
+ */
+describe('transcode output guard', () => {
+  const h264 = () => probe.file({
+    streams: [probe.video({ codec: 'h264' }), probe.audio({ codec: 'eac3', channels: 6 })],
+  });
+
+  it.each([0.001, 0.01, 0.05, 0.19])('discards a runt output at ratio %s', (ratio) => {
+    expect(run(h264(), { transcodeRatio: ratio }).didVisit('Set Original File')).toBe(true);
+  });
+
+  it.each([0.25, 0.5, 0.7, 0.99])('accepts a genuine saving at ratio %s', (ratio) => {
+    expect(run(h264(), { transcodeRatio: ratio }).didVisit('Set Original File')).toBe(false);
+  });
+
+  it('still discards an output that grew', () => {
+    expect(run(h264(), { transcodeRatio: 1.5 }).didVisit('Set Original File')).toBe(true);
+  });
+});

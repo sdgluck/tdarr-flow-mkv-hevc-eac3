@@ -28,15 +28,55 @@ describe('RemuxMKV', () => {
     expect(result.preset.split(',')[0]).toContain('-fflags +genpts');
   });
 
-  it('drops mov_text subtitles, which MKV cannot carry', () => {
+  // MKV cannot carry mov_text (tx3g). Dropping every subtitle the moment one
+  // appeared threw away perfectly good SRT tracks standing beside it.
+  it('converts mov_text to SRT when nothing else carries the dialogue as text', () => {
     const file = probe.file({
       container: 'mp4',
       streams: [probe.video(), probe.audio(), probe.subtitle({ codec: 'mov_text' })],
     });
     const result = call('Tdarr_Plugin_bsh1_RemuxMKV', file);
 
-    expect(result.preset).not.toContain('-map 0:s?');
-    expect(result.infoLog).toContain('Dropping mov_text');
+    expect(result.preset).toContain('-map 0:2');
+    expect(result.preset).toContain('-c:s:0 srt');
+    expect(result.infoLog).toContain('Converting 1 mov_text');
+  });
+
+  it('keeps a companion SRT instead of dropping it with the mov_text', () => {
+    const file = probe.file({
+      container: 'mp4',
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.subtitle({ codec: 'mov_text' }),
+        probe.subtitle({ codec: 'subrip' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_RemuxMKV', file);
+
+    expect(result.preset).toContain('-map 0:3');
+    expect(result.preset).not.toContain('-map 0:2');
+    expect(result.preset).not.toContain('srt');
+    expect(result.infoLog).toContain('Dropping 1 mov_text');
+  });
+
+  it('converts mov_text even when the only companion is an image track', () => {
+    // PGS is not text, so it cannot stand in for the dialogue.
+    const file = probe.file({
+      container: 'mp4',
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.subtitle({ codec: 'hdmv_pgs_subtitle' }),
+        probe.subtitle({ codec: 'mov_text' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_RemuxMKV', file);
+
+    expect(result.preset).toContain('-map 0:2');
+    expect(result.preset).toContain('-map 0:3');
+    // Second subtitle output stream, so :1 - not the input index.
+    expect(result.preset).toContain('-c:s:1 srt');
   });
 
   it('keeps subtitles that are not mov_text', () => {

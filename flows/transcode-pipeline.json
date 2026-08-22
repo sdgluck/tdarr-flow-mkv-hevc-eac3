@@ -132,7 +132,7 @@
       "pluginName": "compareFileSizeRatio",
       "version": "2.0.0",
       "inputsDB": {
-        "greaterThan": "0",
+        "greaterThan": "20",
         "lessThan": "100"
       },
       "fpEnabled": true,
@@ -553,7 +553,7 @@
     {
       "source": "JBA2N2W7L",
       "sourceHandle": "2",
-      "target": "aQKzSWY-r",
+      "target": "ksKmTCZB0",
       "targetHandle": null,
       "id": "edge15"
     },

@@ -25,9 +25,15 @@ file that is already MKV and otherwise stream-copies into Matroska with
 On failure the flow takes `Reset Flow Error` → `Force Remux` (`ForceRemuxMKV`),
 which accepts any input container and adds `+igndts`, enlarged
 `analyzeduration`/`probesize`, `-err_detect ignore_err` and
-`-avoid_negative_ts make_zero`. Both attempts are pure stream copies; nothing is
-re-encoded. If `Force Remux` also fails, the file continues in its original
-container.
+`-avoid_negative_ts make_zero`. If `Force Remux` also fails, the file continues
+in its original container.
+
+Both attempts stream-copy everything MKV can carry. The one exception is
+`mov_text` (tx3g), which is MP4-only: where another text subtitle already
+carries the dialogue the `mov_text` track is dropped, and where none does it is
+converted to SRT. Text to text, so nothing is lost. Dropping *every* subtitle on
+sight of one `mov_text` track — which is what this used to do — threw away
+perfectly good SRT tracks standing beside it.
 
 Each remux branch is followed by `Run MKVPropEdit`, behind an `Is MKV?`
 (`checkFileExtension`) guard.
@@ -46,8 +52,14 @@ by node name:
 NVENC and QuickSync fall back to the CPU encoder on error; a CPU failure routes
 through `Reset Flow Error` to `Set Original File`, keeping the source.
 
-`Compare File Size Ratio` guards the output: if the new file is not smaller,
-`Set Original File` discards it.
+`Compare File Size Ratio` guards the output on **both** sides: anything outside
+20–100% of the original goes to `Set Original File`, which discards it.
+
+The floor matters as much as the ceiling. It was `0`, which no output can fall
+below, and the "smaller than lower bound" handle was wired to accept anyway — so
+an encoder that exited 0 having written a truncated file overwrote the source. A
+0.1% output was confirmed to replace the library file. Both halves were needed:
+raising the floor alone would still have routed the runt to acceptance.
 
 ### 4. Language cleanup
 
@@ -63,8 +75,14 @@ pass over the file.
 - Streams with no language tag are kept.
 - The last audio stream is never removed.
 - **At most one subtitle track survives.** Where several English tracks remain,
-  it keeps the plain one, preferring a full transcript over SDH and SDH over a
-  forced track, and drops the rest in the same pass.
+  it keeps the best one and drops the rest in the same pass. Worst first:
+
+  | rank | kind   | why                                                                                         |
+  | ---- | ------ | ------------------------------------------------------------------------------------------- |
+  | 4    | forced | covers foreign dialogue only, so as the sole track it leaves most of the dialogue uncovered   |
+  | 2    | image  | PGS/VOBSUB cannot be handed to a client as text, so Plex must burn it in — a full transcode  |
+  | 1    | SDH    | complete and text, merely noisy                                                              |
+  | 0    | plain  | preferred                                                                                    |
 
   Two English text tracks are indistinguishable to a player whenever the source
   flags neither. Show B S03E08 labelled its SDH track in the title only, so both

@@ -6,9 +6,9 @@ const details = () => ({
   Type: 'Video',
   Operation: 'Transcode',
   Description: 'Removes non-English audio and subtitle streams, and commentary tracks, in a '
-    + 'single pass. Replaces the separate CleanAudio/CleanSubs plugins, which each did a full '
-    + 'read-and-rewrite of the file.',
-  Version: '1.0.0',
+    + 'single pass, along with any subtitle ffmpeg cannot decode. Replaces the separate '
+    + 'CleanAudio/CleanSubs plugins, which each did a full read-and-rewrite of the file.',
+  Version: '1.1.0',
   Tags: 'pre-processing,ffmpeg,audio,subtitles',
   Inputs: [
     {
@@ -84,6 +84,15 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     response.infoLog += '⚠ Keeping all audio: removing them would leave no audio.\n';
   }
 
+  // A subtitle ffmpeg cannot identify - Matroska WebVTT is the case seen in the
+  // wild - arrives with codec id 0, and mapping it fails the whole command at
+  // the header ("Subtitle codec 0 is not supported"), taking the video with it.
+  // The remux node strips these first; this is the backstop for a file that
+  // reaches here with one anyway.
+  const isUnreadable = stream => !stream.codec_name
+    || stream.codec_name === 'none'
+    || stream.codec_name === 'unknown';
+
   subtitleStreams.forEach(stream => {
     const lang = (stream.tags?.language || '').toLowerCase();
     const title = (stream.tags?.title || '').toLowerCase();
@@ -92,7 +101,11 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     const isSDH = stream.disposition?.hearing_impaired === 1 || title.includes('sdh');
     const isCommentary = stream.disposition?.comment === 1 || title.includes('comment');
 
-    if (lang && lang !== keepLang) {
+    if (isUnreadable(stream)) {
+      subsToRemove.push(stream.index);
+      response.infoLog += `☒ Removing subtitle stream ${stream.index}; ffmpeg reports no `
+        + 'codec for it and mapping it fails the whole command.\n';
+    } else if (lang && lang !== keepLang) {
       subsToRemove.push(stream.index);
       response.infoLog += `☒ Removing subtitle stream ${stream.index} (lang: ${lang}).\n`;
     } else if (removeCommentary && isCommentary) {

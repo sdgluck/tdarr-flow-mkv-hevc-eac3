@@ -6,22 +6,49 @@
 // dialogue as text. Text to text, so nothing is lost.
 const TEXT_SUB_CODECS = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'text', 'mov_text'];
 
+// A subtitle stream this ffmpeg build cannot identify. Matroska may carry a
+// CodecID the demuxer has no decoder for - WebVTT (S_TEXT/WEBVTT) is the one
+// seen in the wild:
+//
+//   [matroska,webm] Unknown/unsupported AVCodecID S_TEXT/WEBVTT.
+//   [matroska,webm] Could not find codec parameters for stream 4
+//                   (Subtitle: none): unknown codec
+//
+// The stream then arrives with codec id 0, and mapping it - even with "-c
+// copy" - kills the whole command at the header, taking the video with it:
+//
+//   [matroska] Subtitle codec 0 is not supported.
+//   [out#0/matroska] Could not write header (incorrect codec parameters ?)
+//
+// So this is not "a subtitle we would rather not keep", it is a stream nothing
+// downstream can touch. Drop it here, before any later stage maps it.
+const isUnreadableSub = (stream) => stream.codec_type === 'subtitle'
+  && (!stream.codec_name || stream.codec_name === 'none' || stream.codec_name === 'unknown');
+
+const unreadableLog = (count) => `\u2612 Dropping ${count} unreadable subtitle stream(s); `
+  + 'ffmpeg reports no codec for them and mapping one fails the whole command.\n';
+
 const planSubtitles = (streams) => {
   const subs = streams.filter(s => s.codec_type === 'subtitle');
   if (subs.length === 0) {
     return { args: '', log: '' };
   }
 
-  const movText = subs.filter(s => s.codec_name === 'mov_text');
+  const unreadable = subs.filter(isUnreadableSub);
+  const readable = subs.filter(s => !isUnreadableSub(s));
+  const unreadableArgs = unreadable.map(s => `-map -0:${s.index}`);
+  const unreadableInfo = unreadable.length > 0 ? unreadableLog(unreadable.length) : '';
+
+  const movText = readable.filter(s => s.codec_name === 'mov_text');
   if (movText.length === 0) {
-    return { args: '-map 0:s?', log: '' };
+    return { args: ['-map 0:s?', ...unreadableArgs].join(' '), log: unreadableInfo };
   }
 
   // Another text track already carries the dialogue, so the mov_text one adds
   // nothing worth a conversion.
-  const hasOtherText = subs.some(s => s.codec_name !== 'mov_text'
+  const hasOtherText = readable.some(s => s.codec_name !== 'mov_text'
     && TEXT_SUB_CODECS.includes(s.codec_name));
-  const kept = hasOtherText ? subs.filter(s => s.codec_name !== 'mov_text') : subs;
+  const kept = hasOtherText ? readable.filter(s => s.codec_name !== 'mov_text') : readable;
 
   // Mapped one by one rather than with "0:s?", because "-c:s:N" counts N among
   // the subtitle OUTPUT streams: the conversion has to name the right one.
@@ -39,7 +66,9 @@ const planSubtitles = (streams) => {
       + 'other text subtitles remain.\n'
     : `\u2612 Converting ${movText.length} mov_text subtitle(s) to SRT; MKV cannot carry mov_text.\n`;
 
-  return { args: [...mapArgs, ...codecArgs].join(' '), log };
+  // The kept streams are mapped one by one here, so an unreadable one is
+  // excluded simply by never being named.
+  return { args: [...mapArgs, ...codecArgs].join(' '), log: unreadableInfo + log };
 };
 
 const details = () => ({
@@ -48,8 +77,10 @@ const details = () => ({
   Name: 'Remux to MKV (strip thumbnails)',
   Type: 'Video',
   Operation: 'Transcode',
-  Description: 'Remuxes file to MKV, stripping embedded thumbnails/attached pictures and incompatible mov_text subtitles.',
-  Version: '1.1.0',
+  Description: 'Remuxes file to MKV, stripping embedded thumbnails/attached pictures, '
+    + 'incompatible mov_text subtitles, and subtitle streams ffmpeg cannot decode. An MKV is '
+    + 'passed through untouched unless it carries one of those undecodable streams.',
+  Version: '1.2.0',
   Tags: 'pre-processing,ffmpeg,remux,mkv',
   Inputs: [],
 });
@@ -68,10 +99,25 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     container: '.mkv',
   };
 
-  // Skip if already MKV
+  const streams = file.ffProbeData?.streams ?? [];
+  const unreadableSubs = streams.filter(isUnreadableSub);
+
+  // An MKV needs no remux - unless it carries a stream that fails every later
+  // command. This node is the flow's first ffmpeg stop, so healing the file
+  // here is what lets the encode, the track clean-up and the final mux run at
+  // all; leave it and each of them dies in turn on the same header error.
   if (file.container === 'mkv') {
-    response.processFile = false;
-    response.infoLog += '☑ File is already MKV, skipping.\n';
+    if (unreadableSubs.length === 0) {
+      response.processFile = false;
+      response.infoLog += '☑ File is already MKV, skipping.\n';
+      return response;
+    }
+
+    response.processFile = true;
+    response.infoLog += unreadableLog(unreadableSubs.length);
+    const excludeMaps = unreadableSubs.map(s => `-map -0:${s.index}`).join(' ');
+    response.preset = '-analyzeduration 100M -probesize 100M, -map 0:V:0 -map 0:a? -map 0:s? '
+      + `${excludeMaps} -c copy -max_muxing_queue_size 9999`;
     return response;
   }
 
@@ -79,7 +125,6 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   response.infoLog += `☒ File is ${file.container}, remuxing to MKV and stripping thumbnails.\n`;
 
   // 0:V:0 (uppercase V) selects only the first real video stream, excluding attached pictures
-  const streams = file.ffProbeData?.streams ?? [];
   const subPlan = planSubtitles(streams);
   response.infoLog += subPlan.log;
 

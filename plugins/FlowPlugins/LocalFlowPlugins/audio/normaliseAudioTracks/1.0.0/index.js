@@ -7,7 +7,8 @@ var details = function () { return ({
         + 'track, preferring the target codec. Replaces the drop/keep-one pair: those could not '
         + 'express "keep two", and dropping by codec alone left the original stereo track '
         + 'alongside a freshly generated one. Never leaves the file with no audio. Also owns '
-        + 'the kept tracks\' default flags and caps their bitrate at what the source carried.',
+        + 'the kept tracks\' default flags and caps their bitrate at what the source carried. '
+        + 'Prefers the configured language, so a foreign track never wins a tie.',
     style: {
         borderColor: '#6efefc',
     },
@@ -39,6 +40,17 @@ var details = function () { return ({
             tooltip: 'Streams with at least this many channels count as surround.',
         },
         {
+            label: 'Preferred Language',
+            name: 'preferredLanguage',
+            type: 'string',
+            defaultValue: 'eng',
+            inputUI: {
+                type: 'text',
+            },
+            tooltip: 'Streams tagged with this language win over equivalent streams in any '
+                + 'other language. Leave empty to ignore language entirely.',
+        },
+        {
             label: 'Bitrate Floor',
             name: 'bitrateFloor',
             type: 'string',
@@ -58,20 +70,44 @@ var details = function () { return ({
     ],
 }); };
 exports.details = details;
+// Language outranks everything else. A wrong-codec track is a track you can
+// still watch; a wrong-language one is not. Observed for real: a file with
+// spa/por/eng stereo tracks, identical in codec, channels and bitrate, came out
+// Spanish-only because the tie fell through to the first stream in the file.
+//
+// Untagged sits between a match and a mismatch, matching CleanTracks: an
+// untagged track is far more often the main one than a foreign one.
+var languageScore = function (stream, preferred) {
+    if (!preferred) {
+        return 0;
+    }
+    var lang = String(((stream.tags || {}).language || '')).toLowerCase();
+    if (!lang) {
+        return 1;
+    }
+    return lang === preferred ? 2 : 0;
+};
 // higher is better; ties fall through to the earlier stream in the file
-var makeIsBetter = function (targetCodec) { return function (candidate, incumbent) {
-    var candidateTarget = candidate.codec_name === targetCodec ? 1 : 0;
-    var incumbentTarget = incumbent.codec_name === targetCodec ? 1 : 0;
-    if (candidateTarget !== incumbentTarget) {
-        return candidateTarget > incumbentTarget;
-    }
-    var candidateChannels = Number(candidate.channels || 0);
-    var incumbentChannels = Number(incumbent.channels || 0);
-    if (candidateChannels !== incumbentChannels) {
-        return candidateChannels > incumbentChannels;
-    }
-    return Number(candidate.bit_rate || 0) > Number(incumbent.bit_rate || 0);
-}; };
+var makeIsBetter = function (targetCodec, preferredLanguage) {
+    return function (candidate, incumbent) {
+        var candidateLang = languageScore(candidate, preferredLanguage);
+        var incumbentLang = languageScore(incumbent, preferredLanguage);
+        if (candidateLang !== incumbentLang) {
+            return candidateLang > incumbentLang;
+        }
+        var candidateTarget = candidate.codec_name === targetCodec ? 1 : 0;
+        var incumbentTarget = incumbent.codec_name === targetCodec ? 1 : 0;
+        if (candidateTarget !== incumbentTarget) {
+            return candidateTarget > incumbentTarget;
+        }
+        var candidateChannels = Number(candidate.channels || 0);
+        var incumbentChannels = Number(incumbent.channels || 0);
+        if (candidateChannels !== incumbentChannels) {
+            return candidateChannels > incumbentChannels;
+        }
+        return Number(candidate.bit_rate || 0) > Number(incumbent.bit_rate || 0);
+    };
+};
 var pickBest = function (candidates, isBetter) {
     var best = candidates[0];
     for (var i = 1; i < candidates.length; i += 1) {
@@ -224,9 +260,10 @@ var plugin = function (args) {
     args.inputs = lib.loadDefaultValues(args.inputs, details);
     (0, flowUtils_1.checkFfmpegCommandInit)(args);
     var targetCodec = String(args.inputs.targetCodec);
+    var preferredLanguage = String(args.inputs.preferredLanguage || '').trim().toLowerCase();
     var surroundMin = Number(args.inputs.surroundMinChannels);
     var floorKbps = parseKbps(args.inputs.bitrateFloor) || 0;
-    var isBetter = makeIsBetter(targetCodec);
+    var isBetter = makeIsBetter(targetCodec, preferredLanguage);
     var streams = args.variables.ffmpegCommand.streams;
     var audioStreams = streams.filter(function (stream) {
         return stream.codec_type === 'audio' && !stream.removed;

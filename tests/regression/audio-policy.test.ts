@@ -300,3 +300,54 @@ describe('transcode output guard', () => {
     expect(run(h264(), { transcodeRatio: 1.5 }).didVisit('Set Original File')).toBe(true);
   });
 });
+
+/**
+ * Language. The tie-breakers below language - codec, channels, bitrate - are
+ * all equal across the three stereo E-AC3 tracks of a typical multi-language
+ * web-rip, so whichever came first in the file used to win. Show D
+ * S01E01 was spa/por/eng in that order and came out Spanish.
+ */
+describe('audio policy: language', () => {
+  const languages = (streams: ReturnType<typeof probe.audio>[]) =>
+    run(probe.file({ streams: [probe.video({ codec: 'h264' }), ...streams] }))
+      .audio.map((s) => s.tags?.language);
+
+  it('keeps English when every other property ties', () => {
+    expect(languages([
+      probe.audio({ codec: 'eac3', channels: 2, language: 'spa' }),
+      probe.audio({ codec: 'eac3', channels: 2, language: 'por' }),
+      probe.audio({ codec: 'eac3', channels: 2, language: 'eng' }),
+    ])).toEqual(['eng']);
+  });
+
+  it('prefers English over a foreign track in the target codec', () => {
+    expect(languages([
+      probe.audio({ codec: 'eac3', channels: 2, language: 'spa' }),
+      probe.audio({ codec: 'aac', channels: 2, language: 'eng' }),
+    ])).toEqual(['eng']);
+  });
+
+  it('prefers an untagged track over a foreign one', () => {
+    // Untagged is far more often the main track than a foreign one; this is the
+    // same judgement CleanTracks makes when it declines to remove them.
+    expect(languages([
+      probe.audio({ codec: 'eac3', channels: 2, language: 'spa' }),
+      probe.audio({ codec: 'eac3', channels: 2, language: null }),
+    ])).toEqual([undefined]);
+  });
+
+  it('picks English in each channel tier independently', () => {
+    const result = run(probe.file({
+      streams: [
+        probe.video({ codec: 'h264' }),
+        probe.audio({ codec: 'eac3', channels: 6, language: 'spa' }),
+        probe.audio({ codec: 'eac3', channels: 6, language: 'eng' }),
+        probe.audio({ codec: 'eac3', channels: 2, language: 'spa' }),
+        probe.audio({ codec: 'eac3', channels: 2, language: 'eng' }),
+      ],
+    })).audio;
+
+    expect(result.map((s) => `${s.tags?.language}/${s.channels}ch`))
+      .toEqual(['eng/6ch', 'eng/2ch']);
+  });
+});

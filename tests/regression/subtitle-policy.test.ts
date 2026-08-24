@@ -97,3 +97,51 @@ describe('subtitle policy: at most one track', () => {
     expect(subtitles([])).toHaveLength(0);
   });
 });
+
+/**
+ * Subtitles ffmpeg cannot decode, e.g. WebVTT in Matroska. Show D
+ * S01E01 carried three, and every ffmpeg command in the flow died in turn:
+ *
+ *   [matroska,webm] Unknown/unsupported AVCodecID S_TEXT/WEBVTT.
+ *   [matroska,webm] Could not find codec parameters for stream 4
+ *                   (Subtitle: none): unknown codec
+ *   [matroska]      Subtitle codec 0 is not supported.
+ *   [out#0/matroska] Could not write header (incorrect codec parameters ?)
+ *
+ * The encode, the track clean-up and the final mux all mapped the streams, so
+ * all three failed and the job ended in transcodeError with the file untouched.
+ * ffprobe reports such a stream with no codec_name at all, which is how they
+ * are recognised - they are dropped, not kept, because nothing downstream can
+ * carry them.
+ */
+const undecodable = (language: string) =>
+  probe.stream('subtitle', { tags: { language }, disposition: {} });
+
+describe('subtitle policy: streams ffmpeg cannot decode', () => {
+  it('drops them rather than failing the job', () => {
+    const result = run(probe.file({
+      container: 'mkv',
+      streams: [
+        probe.video({ codec: 'h264' }),
+        probe.audio({ codec: 'eac3', channels: 2, language: 'eng' }),
+        undecodable('eng'),
+        undecodable('spa'),
+        undecodable('por'),
+      ],
+    }));
+
+    expect(result.subtitles).toHaveLength(0);
+    expect(result.halted).toBeNull();
+    expect(result.replaced).toBe(true);
+  });
+
+  it('keeps a readable track standing beside an undecodable one', () => {
+    const result = subtitles([
+      undecodable('eng'),
+      probe.subtitle({ codec: 'subrip', language: 'eng' }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.codec_name).toBe('subrip');
+  });
+});

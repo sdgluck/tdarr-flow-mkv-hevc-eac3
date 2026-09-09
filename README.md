@@ -80,7 +80,10 @@ container in play that can hold them.
   title. The two tests are independent, gated by `remove_commentary` and
   `remove_sdh` respectively.
 - Streams with no language tag are kept.
-- The last audio stream is never removed.
+- The file is never left with no audio. If every audio stream would go — a
+  release with no English track at all — **all** of them are kept, not one.
+  Choosing between the survivors is not this pass's job: the audio block
+  downstream reduces to one surround and one stereo/mono track regardless.
 - **At most one subtitle track survives.** Where several English tracks remain,
   it keeps the best one and drops the rest in the same pass. Worst first:
 

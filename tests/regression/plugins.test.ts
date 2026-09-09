@@ -302,12 +302,36 @@ describe('CleanTracks', () => {
     expect(inputArgs).toContain('-probesize');
   });
 
-  it('refuses to strip the last audio stream', () => {
+  it('refuses to leave the file with no audio', () => {
     // Better a foreign track than a silent file.
     const file = probe.file({ streams: [probe.video(), probe.audio({ language: 'fre' })] });
     const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
 
     expect(result.processFile).toBe(false);
+    expect(result.infoLog).toContain('would leave no audio');
+  });
+
+  it('keeps every audio track, not just one, when they would all go', () => {
+    // The rule is "never leave the file silent", not "keep one". Picking a
+    // single track here would mean choosing between languages on a file where
+    // the flow has no basis to choose, and the audio block downstream reduces
+    // to one surround and one stereo track anyway.
+    // A foreign subtitle gives the pass something to do, so there is a real
+    // preset to inspect rather than the empty string of a no-op.
+    const file = probe.file({
+      streams: [
+        probe.video(),
+        probe.audio({ language: 'fre', channels: 6 }),
+        probe.audio({ language: 'deu', channels: 2 }),
+        probe.subtitle({ codec: 'subrip', language: 'fre' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs());
+
+    expect(result.processFile).toBe(true);
+    expect(result.preset).toContain('-map -0:3');
+    expect(result.preset).not.toContain('-map -0:1');
+    expect(result.preset).not.toContain('-map -0:2');
     expect(result.infoLog).toContain('would leave no audio');
   });
 

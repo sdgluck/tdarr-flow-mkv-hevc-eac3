@@ -137,6 +137,67 @@ describe('ForceRemuxMKV', () => {
     }
   });
 
+  // ForceRemux only ever runs on a file a normal remux could not handle, which
+  // is exactly where a stream ffmpeg cannot decode turns up. Mapping one kills
+  // the whole command at the header ("Subtitle codec 0 is not supported"), so
+  // the escalation would fail for the same reason its predecessor did. This
+  // copy of planSubtitles had drifted and kept the pre-1.2.0 version.
+  it('drops subtitle streams ffmpeg cannot decode', () => {
+    const file = probe.file({
+      container: 'mkv',
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.stream('subtitle', { tags: { language: 'eng' }, disposition: {} }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_ForceRemuxMKV', file);
+
+    expect(result.preset).toContain('-map -0:2');
+    expect(result.infoLog).toContain('unreadable subtitle stream');
+  });
+
+  it('never names an undecodable stream on the mov_text path either', () => {
+    // The mov_text branch maps kept streams one by one, so an unreadable one is
+    // excluded by never being named - but only if it was filtered out first.
+    const file = probe.file({
+      container: 'mp4',
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.stream('subtitle', { tags: { language: 'eng' }, disposition: {} }),
+        probe.subtitle({ codec: 'mov_text' }),
+      ],
+    });
+    const result = call('Tdarr_Plugin_bsh1_ForceRemuxMKV', file);
+
+    expect(result.preset).not.toContain('-map 0:2');
+    expect(result.preset).toContain('-map 0:3');
+    expect(result.preset).toContain('-c:s:0 srt');
+  });
+
+  it('plans subtitles identically to RemuxMKV', () => {
+    // The two copies are deployed as separate files with nowhere to share from,
+    // so the only guard against them drifting again is this.
+    const file = probe.file({
+      container: 'mp4',
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.stream('subtitle', { tags: { language: 'eng' }, disposition: {} }),
+        probe.subtitle({ codec: 'mov_text' }),
+        probe.subtitle({ codec: 'hdmv_pgs_subtitle' }),
+      ],
+    });
+    // Everything the two presets legitimately disagree on is an input arg or a
+    // trailing muxer flag; the stream plan itself has to match token for token.
+    const subtitlePlan = (id: string) => call(id, file).preset
+      .match(/-map -?0:\S+|-c:s:\d+ \w+/g) ?? [];
+
+    expect(subtitlePlan('Tdarr_Plugin_bsh1_ForceRemuxMKV'))
+      .toEqual(subtitlePlan('Tdarr_Plugin_bsh1_RemuxMKV'));
+  });
+
   it('stays a pure stream copy', () => {
     const file = probe.file({ container: 'avi', streams: [probe.video(), probe.audio()] });
     expect(call('Tdarr_Plugin_bsh1_ForceRemuxMKV', file).preset).toContain('-c copy');

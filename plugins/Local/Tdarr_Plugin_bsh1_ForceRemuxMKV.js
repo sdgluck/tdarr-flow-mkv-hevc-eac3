@@ -1,4 +1,9 @@
 /* eslint-disable */
+// The subtitle planning below is a deliberate copy of RemuxMKV's: each classic
+// plugin is deployed to the server as a standalone file, so there is nowhere to
+// share it from. It drifted once already - this copy kept the pre-1.2.0 version
+// with no unreadable-stream filter, which mattered precisely here, since this
+// plugin only ever runs on a file a normal remux could not handle. Change both.
 // mov_text (tx3g) is MP4-only: Matroska cannot carry it. Dropping every
 // subtitle the moment one appeared - which is what this used to do - threw away
 // perfectly good SRT tracks standing beside it. Keep everything MKV can hold,
@@ -6,22 +11,53 @@
 // dialogue as text. Text to text, so nothing is lost.
 const TEXT_SUB_CODECS = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'text', 'mov_text'];
 
+// A subtitle stream this ffmpeg build cannot identify. Matroska may carry a
+// CodecID the demuxer has no decoder for - WebVTT (S_TEXT/WEBVTT) is the one
+// seen in the wild:
+//
+//   [matroska,webm] Unknown/unsupported AVCodecID S_TEXT/WEBVTT.
+//   [matroska,webm] Could not find codec parameters for stream 4
+//                   (Subtitle: none): unknown codec
+//
+// The stream then arrives with codec id 0, and mapping it - even with "-c
+// copy" - kills the whole command at the header, taking the video with it:
+//
+//   [matroska] Subtitle codec 0 is not supported.
+//   [out#0/matroska] Could not write header (incorrect codec parameters ?)
+//
+// So this is not "a subtitle we would rather not keep", it is a stream nothing
+// downstream can touch. Drop it here, before any later stage maps it.
+const isUnreadableSub = (stream) => stream.codec_type === 'subtitle'
+  && (!stream.codec_name || stream.codec_name === 'none' || stream.codec_name === 'unknown');
+
+const unreadableLog = (count) => `\u2612 Dropping ${count} unreadable subtitle stream(s); `
+  + 'ffmpeg reports no codec for them and mapping one fails the whole command.\n';
+
 const planSubtitles = (streams) => {
   const subs = streams.filter(s => s.codec_type === 'subtitle');
   if (subs.length === 0) {
     return { maps: '', codecs: '', log: '' };
   }
 
-  const movText = subs.filter(s => s.codec_name === 'mov_text');
+  const unreadable = subs.filter(isUnreadableSub);
+  const readable = subs.filter(s => !isUnreadableSub(s));
+  const unreadableArgs = unreadable.map(s => `-map -0:${s.index}`);
+  const unreadableInfo = unreadable.length > 0 ? unreadableLog(unreadable.length) : '';
+
+  const movText = readable.filter(s => s.codec_name === 'mov_text');
   if (movText.length === 0) {
-    return { maps: '-map 0:s?', codecs: '', log: '' };
+    return {
+      maps: ['-map 0:s?', ...unreadableArgs].join(' '),
+      codecs: '',
+      log: unreadableInfo,
+    };
   }
 
   // Another text track already carries the dialogue, so the mov_text one adds
   // nothing worth a conversion.
-  const hasOtherText = subs.some(s => s.codec_name !== 'mov_text'
+  const hasOtherText = readable.some(s => s.codec_name !== 'mov_text'
     && TEXT_SUB_CODECS.includes(s.codec_name));
-  const kept = hasOtherText ? subs.filter(s => s.codec_name !== 'mov_text') : subs;
+  const kept = hasOtherText ? readable.filter(s => s.codec_name !== 'mov_text') : readable;
 
   // Mapped one by one rather than with "0:s?", because "-c:s:N" counts N among
   // the subtitle OUTPUT streams: the conversion has to name the right one.
@@ -39,9 +75,16 @@ const planSubtitles = (streams) => {
       + 'other text subtitles remain.\n'
     : `\u2612 Converting ${movText.length} mov_text subtitle(s) to SRT; MKV cannot carry mov_text.\n`;
 
+  // The kept streams are mapped one by one here, so an unreadable one is
+  // excluded simply by never being named.
+  //
   // Maps and codec overrides are handed back separately because they have to
   // straddle the "-c copy": see the preset below.
-  return { maps: mapArgs.join(' '), codecs: codecArgs.join(' '), log };
+  return {
+    maps: mapArgs.join(' '),
+    codecs: codecArgs.join(' '),
+    log: unreadableInfo + log,
+  };
 };
 
 const details = () => ({

@@ -165,9 +165,14 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
 
   // - 0:V:0 = first real video only (uppercase V excludes attached pictures)
   // - then all audio and subs, with the unwanted ones explicitly excluded
+  // - 0:t? = font attachments, which an ASS subtitle needs to render as authored
+  //   and which "-map 0:s?" does not select. Only into a container that can hold
+  //   them: this plugin keeps whatever container it was handed, and reaches a
+  //   non-MKV one only when both remux attempts failed.
   const excludeMaps = streamsToRemove.map(i => `-map -0:${i}`).join(' ');
+  const attachmentMap = file.container === 'mkv' ? ' -map 0:t?' : '';
   response.preset = `-analyzeduration 100M -probesize 100M, -map 0:V:0 -map 0:a? -map 0:s? `
-    + `${excludeMaps} -c copy -max_muxing_queue_size 9999`;
+    + `${excludeMaps}${attachmentMap} -c copy -max_muxing_queue_size 9999`;
   response.processFile = true;
 
   return response;

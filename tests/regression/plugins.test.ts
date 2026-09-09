@@ -106,6 +106,40 @@ describe('RemuxMKV', () => {
     expect(call('Tdarr_Plugin_bsh1_RemuxMKV', file).preset).toContain('-map 0:s?');
   });
 
+  // An ASS/SSA subtitle names the fonts it wants and Matroska carries them as
+  // attachment streams. "-map 0:s?" does not select those, so a remux that
+  // lists its maps explicitly dropped them and the subtitle rendered in
+  // whatever the player substituted.
+  it.each([
+    ['Tdarr_Plugin_bsh1_RemuxMKV'],
+    ['Tdarr_Plugin_bsh1_ForceRemuxMKV'],
+  ])('carries font attachments across the remux (%s)', (id) => {
+    const file = probe.file({
+      container: 'mp4',
+      streams: [
+        probe.video(),
+        probe.audio(),
+        probe.subtitle({ codec: 'ass' }),
+        probe.stream('attachment', { codec_name: 'ttf' }),
+      ],
+    });
+    expect(call(id, file).preset).toContain('-map 0:t?');
+  });
+
+  it('still strips attached-picture cover art, which is not an attachment', () => {
+    // Cover art is a video stream with disposition.attached_pic, selected by
+    // 0:v and excluded by the uppercase 0:V - "-map 0:t?" does not bring it
+    // back in.
+    const file = probe.file({
+      container: 'mp4',
+      streams: [probe.video(), probe.audio(), probe.attachedPic()],
+    });
+    const { preset } = call('Tdarr_Plugin_bsh1_RemuxMKV', file);
+
+    expect(preset).toContain('-map 0:V:0');
+    expect(preset).not.toContain('-map 0:v');
+  });
+
   it('maps 0:V:0 so attached pictures never reach the muxer', () => {
     const file = probe.file({
       container: 'mp4',
@@ -201,6 +235,35 @@ describe('ForceRemuxMKV', () => {
   it('stays a pure stream copy', () => {
     const file = probe.file({ container: 'avi', streams: [probe.video(), probe.audio()] });
     expect(call('Tdarr_Plugin_bsh1_ForceRemuxMKV', file).preset).toContain('-c copy');
+  });
+});
+
+describe('CleanTracks attachments', () => {
+  const inputs = { tag_language: 'eng', remove_commentary: 'true', remove_sdh: 'false' };
+  const withFont = (container: string) => probe.file({
+    container,
+    streams: [
+      probe.video(),
+      probe.audio({ language: 'eng' }),
+      probe.audio({ language: 'fra' }),
+      probe.subtitle({ codec: 'ass', language: 'eng' }),
+      probe.stream('attachment', { codec_name: 'ttf' }),
+    ],
+  });
+
+  it('carries font attachments through the language clean-up', () => {
+    const result = call('Tdarr_Plugin_bsh1_CleanTracks', withFont('mkv'), inputs);
+
+    expect(result.processFile).toBe(true);
+    expect(result.preset).toContain('-map 0:t?');
+  });
+
+  it('leaves attachments unmapped into a container that cannot hold them', () => {
+    // Reached only when both remux attempts failed and the file is still in its
+    // original container. MP4 has nowhere to put an attachment, and mapping one
+    // fails the mux rather than being ignored.
+    expect(call('Tdarr_Plugin_bsh1_CleanTracks', withFont('mp4'), inputs).preset)
+      .not.toContain('-map 0:t?');
   });
 });
 

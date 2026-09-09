@@ -128,7 +128,7 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     response.infoLog += unreadableLog(unreadableSubs.length);
     const excludeMaps = unreadableSubs.map(s => `-map -0:${s.index}`).join(' ');
     response.preset = '-analyzeduration 100M -probesize 100M, -map 0:V:0 -map 0:a? -map 0:s? '
-      + `${excludeMaps} -c copy -max_muxing_queue_size 9999`;
+      + `${excludeMaps} -map 0:t? -c copy -max_muxing_queue_size 9999`;
     return response;
   }
 
@@ -144,6 +144,12 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   // with unknown timestamp") and emits a truncated file, so the remux must
   // synthesise timestamps from the frame rate. Input-side flag, hence the
   // leading position before the comma that separates input and output args.
+// Font attachments. An ASS/SSA subtitle names the fonts it wants and Matroska
+// carries them alongside as attachment streams; "-map 0:s?" does not select
+// those, so a remux that lists its maps explicitly silently drops them and the
+// subtitle renders in whatever the player substitutes. "?" so a file with none
+// is not an error. Attached-picture cover art is a video stream, not an
+// attachment, so this does not undo the thumbnail stripping above.
   // "-c copy" carries no stream specifier, so it matches every output stream -
   // and ffmpeg resolves a per-stream option by taking the LAST instance that
   // matches. A "-c:s:N srt" placed before it is therefore overridden, the
@@ -151,7 +157,7 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   // at the header on the very error the conversion exists to avoid. The
   // general codec has to come first and the specific override last.
   response.preset = ['-fflags +genpts,', '-map 0:V:0', '-map 0:a?', subPlan.maps,
-    '-c copy', subPlan.codecs, '-max_muxing_queue_size 9999']
+    '-map 0:t?', '-c copy', subPlan.codecs, '-max_muxing_queue_size 9999']
     .filter(part => part !== '')
     .join(' ');
 

@@ -28,7 +28,7 @@ which accepts any input container and adds `+igndts`, enlarged
 `-avoid_negative_ts make_zero`. If `Force Remux` also fails, the file continues
 in its original container.
 
-Both attempts stream-copy everything MKV can carry. The one exception is
+Both attempts stream-copy everything MKV can carry, font attachments included. The one exception is
 `mov_text` (tx3g), which is MP4-only: where another text subtitle already
 carries the dialogue the `mov_text` track is dropped, and where none does it is
 converted to SRT. Text to text, so nothing is lost. Dropping *every* subtitle on
@@ -70,7 +70,9 @@ raising the floor alone would still have routed the runt to acceptance.
 
 `Remove Non English Tracks` (local `CleanTracks`) removes non-English audio and
 subtitles, commentary tracks, and optionally SDH subtitles — all in a single
-pass over the file.
+pass over the file. Font attachments are carried across, so an ASS subtitle
+still renders as authored; they are mapped only into MKV, which is the only
+container in play that can hold them.
 
 - Commentary is detected from the `comment` disposition flag or `comment` in the
   stream title.

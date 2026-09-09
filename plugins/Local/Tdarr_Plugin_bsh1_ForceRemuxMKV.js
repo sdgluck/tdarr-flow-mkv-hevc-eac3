@@ -140,12 +140,18 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   const subPlan = planSubtitles(streams);
   response.infoLog += subPlan.log;
 
+// Font attachments. An ASS/SSA subtitle names the fonts it wants and Matroska
+// carries them alongside as attachment streams; "-map 0:s?" does not select
+// those, so a remux that lists its maps explicitly silently drops them and the
+// subtitle renders in whatever the player substitutes. "?" so a file with none
+// is not an error. Attached-picture cover art is a video stream, not an
+// attachment, so this does not undo the thumbnail stripping above.
   // "-c copy" matches every output stream and ffmpeg takes the LAST matching
   // instance of a per-stream option, so a "-c:s:N srt" before it is silently
   // overridden and the mov_text track is copied into Matroska after all.
   // General codec first, specific override last.
   response.preset = [`${inputArgs},`, '-map 0:V:0', '-map 0:a?', subPlan.maps,
-    '-c copy', subPlan.codecs, '-max_muxing_queue_size 9999',
+    '-map 0:t?', '-c copy', subPlan.codecs, '-max_muxing_queue_size 9999',
     '-avoid_negative_ts make_zero']
     .filter(part => part !== '')
     .join(' ');

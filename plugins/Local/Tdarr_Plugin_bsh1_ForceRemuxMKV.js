@@ -9,12 +9,12 @@ const TEXT_SUB_CODECS = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'text', 'mov_t
 const planSubtitles = (streams) => {
   const subs = streams.filter(s => s.codec_type === 'subtitle');
   if (subs.length === 0) {
-    return { args: '', log: '' };
+    return { maps: '', codecs: '', log: '' };
   }
 
   const movText = subs.filter(s => s.codec_name === 'mov_text');
   if (movText.length === 0) {
-    return { args: '-map 0:s?', log: '' };
+    return { maps: '-map 0:s?', codecs: '', log: '' };
   }
 
   // Another text track already carries the dialogue, so the mov_text one adds
@@ -39,7 +39,9 @@ const planSubtitles = (streams) => {
       + 'other text subtitles remain.\n'
     : `\u2612 Converting ${movText.length} mov_text subtitle(s) to SRT; MKV cannot carry mov_text.\n`;
 
-  return { args: [...mapArgs, ...codecArgs].join(' '), log };
+  // Maps and codec overrides are handed back separately because they have to
+  // straddle the "-c copy": see the preset below.
+  return { maps: mapArgs.join(' '), codecs: codecArgs.join(' '), log };
 };
 
 const details = () => ({
@@ -95,8 +97,15 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   const subPlan = planSubtitles(streams);
   response.infoLog += subPlan.log;
 
-  response.preset = `${inputArgs}, -map 0:V:0 -map 0:a? ${subPlan.args} -c copy `
-    + '-max_muxing_queue_size 9999 -avoid_negative_ts make_zero';
+  // "-c copy" matches every output stream and ffmpeg takes the LAST matching
+  // instance of a per-stream option, so a "-c:s:N srt" before it is silently
+  // overridden and the mov_text track is copied into Matroska after all.
+  // General codec first, specific override last.
+  response.preset = [`${inputArgs},`, '-map 0:V:0', '-map 0:a?', subPlan.maps,
+    '-c copy', subPlan.codecs, '-max_muxing_queue_size 9999',
+    '-avoid_negative_ts make_zero']
+    .filter(part => part !== '')
+    .join(' ');
 
   return response;
 };

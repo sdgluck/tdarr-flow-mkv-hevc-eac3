@@ -79,6 +79,25 @@ describe('RemuxMKV', () => {
     expect(result.preset).toContain('-c:s:1 srt');
   });
 
+  // ffmpeg resolves a per-stream option by taking the LAST instance that
+  // matches the stream, and "-c copy" carries no specifier, so it matches the
+  // subtitle stream too. With "-c:s:N srt" written first the override is
+  // discarded, mov_text is stream-copied into Matroska after all, and the mux
+  // dies at the header - the exact failure the conversion exists to prevent.
+  it.each([
+    ['Tdarr_Plugin_bsh1_RemuxMKV'],
+    ['Tdarr_Plugin_bsh1_ForceRemuxMKV'],
+  ])('orders -c copy before the per-stream SRT override (%s)', (id) => {
+    const file = probe.file({
+      container: 'mp4',
+      streams: [probe.video(), probe.audio(), probe.subtitle({ codec: 'mov_text' })],
+    });
+    const { preset } = call(id, file);
+
+    expect(preset).toContain('-c:s:0 srt');
+    expect(preset.indexOf('-c copy')).toBeLessThan(preset.indexOf('-c:s:0 srt'));
+  });
+
   it('keeps subtitles that are not mov_text', () => {
     const file = probe.file({
       container: 'mp4',

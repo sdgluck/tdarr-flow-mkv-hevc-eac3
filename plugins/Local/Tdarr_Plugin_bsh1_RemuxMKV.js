@@ -31,7 +31,7 @@ const unreadableLog = (count) => `\u2612 Dropping ${count} unreadable subtitle s
 const planSubtitles = (streams) => {
   const subs = streams.filter(s => s.codec_type === 'subtitle');
   if (subs.length === 0) {
-    return { args: '', log: '' };
+    return { maps: '', codecs: '', log: '' };
   }
 
   const unreadable = subs.filter(isUnreadableSub);
@@ -41,7 +41,11 @@ const planSubtitles = (streams) => {
 
   const movText = readable.filter(s => s.codec_name === 'mov_text');
   if (movText.length === 0) {
-    return { args: ['-map 0:s?', ...unreadableArgs].join(' '), log: unreadableInfo };
+    return {
+      maps: ['-map 0:s?', ...unreadableArgs].join(' '),
+      codecs: '',
+      log: unreadableInfo,
+    };
   }
 
   // Another text track already carries the dialogue, so the mov_text one adds
@@ -68,7 +72,14 @@ const planSubtitles = (streams) => {
 
   // The kept streams are mapped one by one here, so an unreadable one is
   // excluded simply by never being named.
-  return { args: [...mapArgs, ...codecArgs].join(' '), log: unreadableInfo + log };
+  //
+  // Maps and codec overrides are handed back separately because they have to
+  // straddle the "-c copy": see the preset below.
+  return {
+    maps: mapArgs.join(' '),
+    codecs: codecArgs.join(' '),
+    log: unreadableInfo + log,
+  };
 };
 
 const details = () => ({
@@ -133,8 +144,16 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   // with unknown timestamp") and emits a truncated file, so the remux must
   // synthesise timestamps from the frame rate. Input-side flag, hence the
   // leading position before the comma that separates input and output args.
-  response.preset = `-fflags +genpts, -map 0:V:0 -map 0:a? ${subPlan.args} -c copy `
-    + '-max_muxing_queue_size 9999';
+  // "-c copy" carries no stream specifier, so it matches every output stream -
+  // and ffmpeg resolves a per-stream option by taking the LAST instance that
+  // matches. A "-c:s:N srt" placed before it is therefore overridden, the
+  // mov_text track is stream-copied into Matroska after all, and the mux dies
+  // at the header on the very error the conversion exists to avoid. The
+  // general codec has to come first and the specific override last.
+  response.preset = ['-fflags +genpts,', '-map 0:V:0', '-map 0:a?', subPlan.maps,
+    '-c copy', subPlan.codecs, '-max_muxing_queue_size 9999']
+    .filter(part => part !== '')
+    .join(' ');
 
   return response;
 };

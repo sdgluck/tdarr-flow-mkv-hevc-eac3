@@ -519,6 +519,18 @@
         "x": 380,
         "y": 200
       }
+    },
+    {
+      "id": "rstGpu",
+      "name": "Reset Flow Error",
+      "sourceRepo": "Community",
+      "pluginName": "resetFlowError",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "position": {
+        "x": 1140,
+        "y": -192
+      }
     }
   ],
   "flowEdges": [
@@ -890,14 +902,14 @@
       "id": "enc-err-nv",
       "source": "aRB7_yBQE",
       "sourceHandle": "err1",
-      "target": "audCpuEnc",
+      "target": "rstGpu",
       "targetHandle": null
     },
     {
       "id": "enc-err-qsv",
       "source": "L5oZNsSMG",
       "sourceHandle": "err1",
-      "target": "audCpuEnc",
+      "target": "rstGpu",
       "targetHandle": null
     },
     {
@@ -947,6 +959,13 @@
       "source": "TOqGPovz0",
       "sourceHandle": "2",
       "target": "gateMkv1",
+      "targetHandle": null
+    },
+    {
+      "id": "enc-err-gpu-rst",
+      "source": "rstGpu",
+      "sourceHandle": "1",
+      "target": "audCpuEnc",
       "targetHandle": null
     }
   ],

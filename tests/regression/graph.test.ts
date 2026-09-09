@@ -100,11 +100,26 @@ describe('invariants the pipeline depends on', () => {
     // now fall back to the CPU encoder; a CPU failure reverts to the original
     // and carries on without the transcode.
     for (const encoder of [nodes.encodeNvidia, nodes.encodeQsv]) {
-      expect(flow.target(encoder, 'err1')).toBe(nodes.encodeCpu);
+      expect(flow.target(flow.target(encoder, 'err1') as string, '1')).toBe(nodes.encodeCpu);
     }
     const cpuFallback = flow.target(nodes.encodeCpu, 'err1');
     expect(cpuFallback).not.toBeNull();
     expect(flow.node(cpuFallback as string).pluginName).toBe('resetFlowError');
+  });
+
+  it('clears the flow error on every error edge it recovers from', () => {
+    // flowFailed survives an err1 hop. A node that recovers but never resets it
+    // finishes the job in error status even though the file was transcoded,
+    // cleaned and committed - so Tdarr reports a failure over a good file.
+    // resetFlowError is the only thing that clears the flag.
+    const recovered = flow.edges.filter((edge) => edge.sourceHandle === 'err1');
+    expect(recovered.length).toBeGreaterThan(0);
+
+    for (const edge of recovered) {
+      const target = flow.node(edge.target);
+      expect(target.pluginName, `${edge.id} recovers via ${target.name}`)
+        .toBe('resetFlowError');
+    }
   });
 
   it('leaves Execute without an error edge, deliberately', () => {

@@ -50,7 +50,12 @@ by node name:
 | otherwise | `Migz1FFMPEG_CPU`                   |
 
 NVENC and QuickSync fall back to the CPU encoder on error; a CPU failure routes
-through `Reset Flow Error` to `Set Original File`, keeping the source.
+to `Set Original File`, keeping the source.
+
+Every error edge passes through `Reset Flow Error` first. `flowFailed` survives
+an `err1` hop, and a job that ends with it set is reported as a transcode error
+however well the rest of the flow went — so without the reset a GPU hiccup
+committed a perfectly good file and still reported failure.
 
 `Compare File Size Ratio` guards the output on **both** sides: anything outside
 20–100% of the original goes to `Set Original File`, which discards it.
@@ -207,8 +212,9 @@ flowchart TD
     NV -->|no| INTEL{Intel?}
     INTEL -->|yes| ENC2[Transcode QuickSync]
     INTEL -->|no| ENC3[Transcode CPU]
-    ENC1 -.->|err| ENC3
-    ENC2 -.->|err| ENC3
+    ENC1 -.->|err| RSTG[Reset Flow Error]
+    ENC2 -.->|err| RSTG
+    RSTG --> ENC3
     ENC3 -.->|err| RST3[Reset Flow Error]
     RST3 --> ORIG
     ENC1 --> RATIO{Smaller?}

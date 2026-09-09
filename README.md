@@ -136,9 +136,13 @@ Nodes, in order:
   `Stereo Present?` branch. It matches on codec **and** exact channel count, so
   it is a no-op on a stereo-only source that is already E-AC3.
 - `Ensure E-AC3 Mono 96k` handles mono-only files. Mono is never upmixed.
+- `Reorder Streams` is configured for `streamTypes` only. It groups the streams
+  video / audio / subtitle; its sort is stable, so the audio order the next node
+  sets is the one that survives.
 - `Normalise Audio Tracks` (local plugin) reduces to one surround and one
   stereo/mono track, preferring E-AC3, then channel count, then bitrate, and
-  sets the audio order with surround first. It also owns two things `Ensure`
+  sets the audio order with surround first. It is deliberately the **last** node
+  before `Execute`. It also owns two things `Ensure`
   gets wrong, because `Ensure` builds a track by deep-cloning the stream it
   converts from:
   - **The default flag.** Every generated track inherits the source's, so two
@@ -161,8 +165,10 @@ Nodes, in order:
     `-avoid_negative_ts make_zero` — but only when the command is rewriting the
     file anyway, because `Execute` forces `shouldProcess` whenever
     `overallOuputArguments` is non-empty, and an unconditional argument would
-    rewrite the whole library on every pass.
-- `Reorder Streams` is configured for `streamTypes` only.
+    rewrite the whole library on every pass. That test only means anything with
+    nothing downstream of it: `Reorder Streams` sets `shouldProcess` itself when
+    it moves a stream, and while it ran *after* Normalise a reorder-only rewrite
+    went out unpinned.
 - `Execute` builds and runs the command. Streams with no output args get
   `-c copy`, so video and subtitles are remuxed, never re-encoded.
 
@@ -236,10 +242,10 @@ flowchart TD
     SURR -->|no| ST{Stereo Present?}
     ST -->|yes| ENST
     ST -->|no| ENSM[Ensure E-AC3 Mono 96k]
-    ENST --> NORM[Normalise Audio Tracks]
-    ENSM --> NORM
-    NORM --> ORDER[Reorder Streams]
-    ORDER --> EXEC[Execute]
+    ENST --> ORDER[Reorder Streams]
+    ENSM --> ORDER
+    ORDER --> NORM[Normalise Audio Tracks]
+    NORM --> EXEC[Execute]
 
     EXEC --> CHG{File Changed?}
     CHG -->|no| REPL[Replace Original File]
@@ -254,8 +260,8 @@ flowchart TD
         ENSS
         ENST
         ENSM
-        NORM
         ORDER
+        NORM
         EXEC
     end
 ```

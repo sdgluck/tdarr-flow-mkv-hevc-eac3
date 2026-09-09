@@ -351,7 +351,9 @@ var plugin = function (args) {
     // players generally default to the first audio track, so this decides what
     // you actually hear. "Reorder Streams" cannot do it: its channel map only
     // knows 8/6/2/1, so a 4-channel track sorts as an empty string and lands
-    // wherever it started.
+    // wherever it started. It runs before this node and groups by stream type
+    // only, and its sort is stable, so the order set here is the one Execute
+    // sees.
     if (keep.length === 2) {
         var surroundKeep = keep[0];
         var stereoKeep = keep[1];
@@ -378,6 +380,14 @@ var plugin = function (args) {
     // whenever overallOuputArguments is non-empty, so adding this
     // unconditionally would rewrite every file in the library on every pass,
     // for ever.
+    //
+    // This has to be the last node before Execute for the test to mean
+    // anything. "Reorder Streams" sets shouldProcess itself when it moves a
+    // stream, and it used to run after this one, so a rewrite triggered by a
+    // reorder alone went out with ffmpeg's default "-avoid_negative_ts auto"
+    // and the guard silently did not apply. Nothing downstream of here can set
+    // the flag now: Execute's own additions are the removals this node already
+    // accounts for.
     if (args.variables.ffmpegCommand.shouldProcess) {
         var overall = args.variables.ffmpegCommand.overallOuputArguments;
         if (overall.indexOf('-avoid_negative_ts') === -1) {

@@ -209,7 +209,7 @@
       "id": "audReorder",
       "position": {
         "x": 624,
-        "y": 816
+        "y": 660
       }
     },
     {
@@ -489,7 +489,7 @@
       "fpEnabled": true,
       "position": {
         "x": 624,
-        "y": 660
+        "y": 816
       },
       "inputsDB": {
         "targetCodec": "eac3",
@@ -705,7 +705,7 @@
     {
       "source": "audReorder",
       "sourceHandle": "1",
-      "target": "audExec001",
+      "target": "audNorm",
       "targetHandle": null,
       "id": "aud-e12"
     },
@@ -881,21 +881,21 @@
       "id": "aud-n7",
       "source": "audEnsSt",
       "sourceHandle": "1",
-      "target": "audNorm",
+      "target": "audReorder",
       "targetHandle": null
     },
     {
       "id": "aud-n8",
       "source": "audEnsMono",
       "sourceHandle": "1",
-      "target": "audNorm",
+      "target": "audReorder",
       "targetHandle": null
     },
     {
       "id": "aud-n9",
       "source": "audNorm",
       "sourceHandle": "1",
-      "target": "audReorder",
+      "target": "audExec001",
       "targetHandle": null
     },
     {

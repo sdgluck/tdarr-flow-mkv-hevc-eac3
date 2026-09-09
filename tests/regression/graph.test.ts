@@ -76,8 +76,9 @@ describe('invariants the pipeline depends on', () => {
     // Ensure only adds; without this the original stereo track would survive
     // alongside the freshly generated one.
     for (const source of [nodes.ensureStereo, nodes.ensureMono]) {
-      expect(flow.target(source, '1')).toBe(nodes.normalise);
+      expect(flow.target(source, '1')).toBe(nodes.reorder);
     }
+    expect(flow.target(nodes.reorder, '1')).toBe(nodes.normalise);
     expect(flow.node(nodes.normalise).pluginName).toBe('normaliseAudioTracks');
   });
 
@@ -85,6 +86,20 @@ describe('invariants the pipeline depends on', () => {
     // Reorder's channel map only knows 8/6/2/1, so a 4-channel track sorts as
     // an empty string and gets pulled behind a stereo one.
     expect(flow.node(nodes.reorder).inputsDB?.processOrder).toBe('streamTypes');
+  });
+
+  it('runs Normalise last, so its rewrite test sees the whole command', () => {
+    // Normalise pins "-avoid_negative_ts make_zero", but only when the command
+    // is rewriting the file anyway - an unconditional overall output arg makes
+    // Execute rewrite every file in the library on every pass. Reorder sets
+    // shouldProcess itself when it moves a stream, so while it ran after
+    // Normalise a reorder-only rewrite escaped the pin.
+    expect(flow.target(nodes.normalise, '1')).toBe(nodes.execute);
+
+    // Nothing else may reach Execute, or it could set shouldProcess after
+    // Normalise has already decided whether to pin the timestamp origin.
+    const upstream = flow.incoming(nodes.execute).map((edge) => flow.node(edge.source));
+    expect(upstream.map((n) => n.pluginName)).toEqual(['normaliseAudioTracks']);
   });
 
   it('pins the container to mkv before planning audio streams', () => {

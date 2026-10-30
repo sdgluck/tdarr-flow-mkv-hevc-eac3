@@ -20,13 +20,17 @@ atom) exit immediately with the library file untouched.
 
 `Remux & Heal Container` runs the local `RemuxMKV` plugin, which no-ops on a
 file that is already MKV and otherwise stream-copies into Matroska with
-`-fflags +genpts`.
+`-fflags +genpts`. "Already MKV" is judged by the extension, so an MKV carrying
+`mov_text` counts as a misnamed MP4 and is remuxed too.
 
 On failure the flow takes `Reset Flow Error` → `Force Remux` (`ForceRemuxMKV`),
 which accepts any input container and adds `+igndts`, enlarged
 `analyzeduration`/`probesize`, `-err_detect ignore_err` and
 `-avoid_negative_ts make_zero`. If `Force Remux` also fails, the file continues
 in its original container.
+
+Both attempts also drop audio description tracks, since MP4 track names do not
+survive the remux for `CleanTracks` to read, unless that would leave no audio.
 
 Both attempts stream-copy everything MKV can carry, font attachments included. The one exception is
 `mov_text` (tx3g), which is MP4-only: where another text subtitle already
@@ -277,9 +281,11 @@ Classic plugins live at `/app/server/Tdarr/Plugins/Local/*.js`; flow plugins at
 
 Used by the flow:
 
-- `RemuxMKV` — stream-copy remux to MKV, no-op if already MKV.
+- `RemuxMKV` — stream-copy remux to MKV, no-op if already MKV (unless it holds
+  `mov_text`).
 - `ForceRemuxMKV` — permissive remux, any input container.
-- `CleanTracks` — single-pass removal of non-English / commentary / SDH tracks.
+- `CleanTracks` — single-pass removal of non-English / commentary / audio
+  description / SDH tracks.
 - `normaliseAudioTracks` — reduce to one surround + one stereo/mono track and
   set audio order.
 

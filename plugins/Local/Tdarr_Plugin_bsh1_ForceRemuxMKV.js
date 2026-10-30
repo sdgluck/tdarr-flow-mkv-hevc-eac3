@@ -33,6 +33,39 @@ const isUnreadableSub = (stream) => stream.codec_type === 'subtitle'
 const unreadableLog = (count) => `\u2612 Dropping ${count} unreadable subtitle stream(s); `
   + 'ffmpeg reports no codec for them and mapping one fails the whole command.\n';
 
+// Audio description narrates over the mix for blind viewers, and it is tagged
+// with the film's own language, so the language pass keeps it. Left in, a later
+// stage can pick it: Show A S01E03 built its only stereo track from one.
+//
+// An MP4 hands ffmpeg no title for its tracks at all - ffprobe reports only the
+// language - and the names survive solely in ExifTool's Track<N>Name and
+// MediaInfo's Title. A remux to MKV throws both away, so the remux has to act on
+// them; by the time CleanTracks runs the track looks like any other.
+const DESCRIPTION_TITLE = /descri(ption|ptive)|visually impaired/i;
+
+const isDescriptionAudio = (stream, file) => {
+  if (stream.disposition?.visual_impaired === 1 || stream.disposition?.descriptions === 1) {
+    return true;
+  }
+  const mediaInfoTrack = (file.mediaInfo?.track ?? [])
+    .find(track => Number(track.StreamOrder) === stream.index);
+  return [stream.tags?.title, mediaInfoTrack?.Title, file.meta?.[`Track${stream.index + 1}Name`]]
+    .some(title => DESCRIPTION_TITLE.test(title || ''));
+};
+
+// Never returns every audio stream: a narrated track beats a silent file.
+const planAudio = (streams, file) => {
+  const audio = streams.filter(s => s.codec_type === 'audio');
+  const description = audio.filter(s => isDescriptionAudio(s, file));
+  if (description.length === 0 || description.length === audio.length) {
+    return { maps: '', log: '' };
+  }
+  return {
+    maps: description.map(s => `-map -0:${s.index}`).join(' '),
+    log: `☒ Dropping ${description.length} audio description track(s).\n`,
+  };
+};
+
 const planSubtitles = (streams) => {
   const subs = streams.filter(s => s.codec_type === 'subtitle');
   if (subs.length === 0) {
@@ -94,7 +127,7 @@ const details = () => ({
   Type: 'Video',
   Operation: 'Transcode',
   Description: 'Last-resort remux to MKV from any container, using permissive demuxer flags. Escalation for files that fail a normal remux, and a repair for structurally broken MKVs that fail stats tagging.',
-  Version: '2.0.0',
+  Version: '2.1.0',
   Tags: 'pre-processing,ffmpeg,remux,mkv,repair',
   Inputs: [],
 });
@@ -137,8 +170,9 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
 
   // 0:V:0 (uppercase V) excludes attached pictures
   const streams = file.ffProbeData?.streams ?? [];
+  const audioPlan = planAudio(streams, file);
   const subPlan = planSubtitles(streams);
-  response.infoLog += subPlan.log;
+  response.infoLog += audioPlan.log + subPlan.log;
 
 // Font attachments. An ASS/SSA subtitle names the fonts it wants and Matroska
 // carries them alongside as attachment streams; "-map 0:s?" does not select
@@ -150,7 +184,7 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   // instance of a per-stream option, so a "-c:s:N srt" before it is silently
   // overridden and the mov_text track is copied into Matroska after all.
   // General codec first, specific override last.
-  response.preset = [`${inputArgs},`, '-map 0:V:0', '-map 0:a?', subPlan.maps,
+  response.preset = [`${inputArgs},`, '-map 0:V:0', '-map 0:a?', audioPlan.maps, subPlan.maps,
     '-map 0:t?', '-c copy', subPlan.codecs, '-max_muxing_queue_size 9999',
     '-avoid_negative_ts make_zero']
     .filter(part => part !== '')

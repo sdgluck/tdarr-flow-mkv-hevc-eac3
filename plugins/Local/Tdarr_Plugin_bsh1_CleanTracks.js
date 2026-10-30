@@ -1,14 +1,34 @@
 /* eslint-disable */
+// Audio description narrates over the mix for blind viewers, and it is tagged
+// with the film's own language, so the language pass keeps it. Left in, a later
+// stage can pick it: Show A S01E03 built its only stereo track from one.
+//
+// An MP4 hands ffmpeg no title for its tracks at all - ffprobe reports only the
+// language - and the names survive solely in ExifTool's Track<N>Name and
+// MediaInfo's Title. A remux to MKV throws both away, so the remux has to act on
+// them; by the time CleanTracks runs the track looks like any other.
+const DESCRIPTION_TITLE = /descri(ption|ptive)|visually impaired/i;
+
+const isDescriptionAudio = (stream, file) => {
+  if (stream.disposition?.visual_impaired === 1 || stream.disposition?.descriptions === 1) {
+    return true;
+  }
+  const mediaInfoTrack = (file.mediaInfo?.track ?? [])
+    .find(track => Number(track.StreamOrder) === stream.index);
+  return [stream.tags?.title, mediaInfoTrack?.Title, file.meta?.[`Track${stream.index + 1}Name`]]
+    .some(title => DESCRIPTION_TITLE.test(title || ''));
+};
+
 const details = () => ({
   id: 'Tdarr_Plugin_bsh1_CleanTracks',
   Stage: 'Pre-processing',
   Name: 'Remove Non-English Audio and Subtitles',
   Type: 'Video',
   Operation: 'Transcode',
-  Description: 'Removes non-English audio and subtitle streams, and commentary tracks, in a '
-    + 'single pass, along with any subtitle ffmpeg cannot decode. Replaces the separate '
+  Description: 'Removes non-English audio and subtitle streams, commentary and audio description tracks, '
+    + 'in a single pass, along with any subtitle ffmpeg cannot decode. Replaces the separate '
     + 'CleanAudio/CleanSubs plugins, which each did a full read-and-rewrite of the file.',
-  Version: '1.1.0',
+  Version: '1.2.0',
   Tags: 'pre-processing,ffmpeg,audio,subtitles',
   Inputs: [
     {
@@ -73,6 +93,9 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
     } else if (removeCommentary && isCommentary) {
       audioToRemove.push(stream.index);
       response.infoLog += `☒ Removing commentary audio stream ${stream.index}.\n`;
+    } else if (removeCommentary && isDescriptionAudio(stream, file)) {
+      audioToRemove.push(stream.index);
+      response.infoLog += `☒ Removing audio description stream ${stream.index}.\n`;
     }
   });
 

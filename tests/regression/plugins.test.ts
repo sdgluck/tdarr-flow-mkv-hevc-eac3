@@ -149,6 +149,79 @@ describe('RemuxMKV', () => {
   });
 });
 
+// Show A S01E03: an MP4 named .mkv, its video after 12 audio streams and
+// mov_text subtitles behind. Reduced to the shape that matters.
+describe('an MP4 misnamed .mkv', () => {
+  const misnamed = () => {
+    const file = probe.file({
+      container: 'mkv',
+      streams: [
+        probe.audio({ codec: 'eac3', channels: 6 }),
+        probe.audio({ codec: 'eac3', channels: 6 }),
+        probe.video(),
+        probe.subtitle({ codec: 'mov_text' }),
+      ],
+    });
+    return {
+      ...file,
+      file_size: 3631,
+      meta: { Duration: 2739, Track2Name: 'anglais - Description sonore' },
+      mediaInfo: {
+        track: [
+          { '@type': 'General' },
+          { '@type': 'Video', StreamOrder: '2', BitRate: '6506809' },
+          { '@type': 'Audio', StreamOrder: '0', BitRate: '640000' },
+          { '@type': 'Audio', StreamOrder: '1', BitRate: '640000' },
+          { '@type': 'Text', StreamOrder: '3' },
+        ],
+      },
+    } as TdarrFile;
+  };
+
+  it('is remuxed, converting the mov_text the extension hid', () => {
+    const result = call('Tdarr_Plugin_bsh1_RemuxMKV', misnamed());
+
+    expect(result.processFile).toBe(true);
+    expect(result.preset).toContain('-c:s:0 srt');
+  });
+
+  it.each([
+    ['Tdarr_Plugin_bsh1_RemuxMKV'],
+    ['Tdarr_Plugin_bsh1_ForceRemuxMKV'],
+  ])('%s drops audio description named only in the MP4 metadata', (id) => {
+    const result = call(id, misnamed());
+
+    expect(result.preset).toContain('-map -0:1');
+    expect(result.preset).not.toContain('-map -0:0');
+  });
+
+  it.each([
+    ['Tdarr_Plugin_bsh1_RemuxMKV'],
+    ['Tdarr_Plugin_bsh1_ForceRemuxMKV'],
+  ])('%s never drops the last audio track', (id) => {
+    const file = probe.file({
+      container: 'mp4',
+      streams: [probe.audio({ title: 'Audio Description' }), probe.video()],
+    });
+
+    expect(call(id, file).preset).not.toContain('-map -0:0');
+  });
+
+  it('QSV reads the video bitrate, not the audio track at the same position', () => {
+    const result = call('Tdarr_Plugin_bsh1_Boosh_FFMPEG_QSV_HEVC', misnamed());
+
+    expect(result.infoLog).toContain('current video bitrate is 6507kbps');
+  });
+
+  it('leaves a real MKV with no mov_text alone', () => {
+    const file = probe.file({
+      container: 'mkv',
+      streams: [probe.video(), probe.audio(), probe.subtitle({ codec: 'subrip' })],
+    });
+    expect(call('Tdarr_Plugin_bsh1_RemuxMKV', file).processFile).toBe(false);
+  });
+});
+
 describe('ForceRemuxMKV', () => {
   it('accepts a non-MKV container', () => {
     const file = probe.file({ container: 'mp4', streams: [probe.video(), probe.audio()] });
@@ -382,6 +455,13 @@ describe('CleanTracks', () => {
     });
     const result = call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs({ remove_sdh: 'true' }));
     expect(result.preset).toContain('-map -0:2');
+  });
+
+  it('removes audio description identified by its title', () => {
+    const file = probe.file({
+      streams: [probe.video(), probe.audio(), probe.audio({ title: 'English - Descriptive Audio' })],
+    });
+    expect(call('Tdarr_Plugin_bsh1_CleanTracks', file, inputs()).preset).toContain('-map -0:2');
   });
 
   it('removes commentary identified by the disposition flag', () => {

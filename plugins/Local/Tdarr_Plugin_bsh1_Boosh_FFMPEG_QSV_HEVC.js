@@ -30,7 +30,7 @@ const details = () => ({
     specified in "hevc_max_bitrate". This plugin relies on understanding the accurate video bitrate of your files. 
     It's highly recommended to first remux into MKV & enable "Run mkvpropedit on files before running plugins" under 
     Tdarr>Options.`,
-  Version: '1.4',
+  Version: '1.5',
   Tags: 'pre-processing,ffmpeg,video only,qsv,h265,hevc,av1,configurable',
   Inputs: [
     {
@@ -366,6 +366,16 @@ const details = () => ({
   ],
 });
 
+// MediaInfo lists General, then Video, then Audio, then Text, whatever order the
+// container stores them in, so its positions do not line up with ffprobe's. The
+// upstream "track[i + 1]" holds only when video is the first stream. With 12 audio
+// streams ahead of the video, Show A S01E03 read an E-AC3 track: a 6500k
+// video was taken for 640k and targeted at 320k. Match on StreamOrder instead.
+const mediaInfoVideoTrack = (file, streamIndex) => {
+  const videoTracks = (file.mediaInfo?.track ?? []).filter(track => track['@type'] === 'Video');
+  return videoTracks.find(track => Number(track.StreamOrder) === streamIndex) ?? videoTracks[0] ?? {};
+};
+
 // VARIABLES
 let currentBitrate = 0;
 let overallBitRate = 0;
@@ -421,7 +431,7 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
         && file.ffProbeData.streams[i].codec_name !== 'png') {
         if (videoBR <= 0) { // Process if videoBR is not yet valid
           try { // Try checking file stats using Mediainfo first, then ffprobe.
-            videoBR = Number(file.mediaInfo.track[i + 1].BitRate) / 1000;
+            videoBR = Number(mediaInfoVideoTrack(file, i).BitRate) / 1000;
             if (videoBR <= 0 || Number.isNaN(videoBR)) {
               if (Number(file.ffProbeData.streams[i].tags.BPS) > 0) {
                 videoBR = file.ffProbeData.streams[i].tags.BPS / 1000;
@@ -443,8 +453,8 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
               duration = file.meta.Duration / 60;
             }
             if (duration <= 0 || Number.isNaN(duration)) {
-              if (typeof file.mediaInfo.track[i + 1].Duration !== 'undefined') {
-                duration = file.mediaInfo.track[i + 1].Duration;
+              if (typeof mediaInfoVideoTrack(file, i).Duration !== 'undefined') {
+                duration = mediaInfoVideoTrack(file, i).Duration;
                 duration = (new Date(`1970-01-01T${duration}Z`).getTime() / 1000) / 60;
               } else if (typeof file.ffProbeData.streams[i].tags.DURATION !== 'undefined') {
                 duration = file.ffProbeData.streams[i].tags.DURATION;
@@ -639,9 +649,9 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
           // Had at least one case where a file contained no evident HDR data but was marked as HDR content
           // meaning transcode OR plex would butcher the file
           try {
-            if (typeof file.mediaInfo.track[i + 1].HDR_Format !== 'undefined') {
+            if (typeof mediaInfoVideoTrack(file, i).HDR_Format !== 'undefined') {
               response.infoLog += '==ERROR== This file has Media data implying it is HDR '
-                + `(${file.mediaInfo.track[i + 1].HDR_Format}), `
+                + `(${mediaInfoVideoTrack(file, i).HDR_Format}), `
                 + 'but no details about color space or primaries... '
                 + 'Unable to convert and safely keep HDR data. Aborting!\n';
               return response;
@@ -652,11 +662,11 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
         } else {
           // If specifically marked Dolby Vision
           try {
-            if (file.mediaInfo.track[i + 1].HDR_Format.search('Dolby Vision') >= 0
-              || file.mediaInfo.track[i + 1].HDR_Format.search('HDR10+') >= 0
-              || file.mediaInfo.track[i + 1].HDR_Format.search('SMPTE ST 2094 App 4') >= 0) {
+            if (mediaInfoVideoTrack(file, i).HDR_Format.search('Dolby Vision') >= 0
+              || mediaInfoVideoTrack(file, i).HDR_Format.search('HDR10+') >= 0
+              || mediaInfoVideoTrack(file, i).HDR_Format.search('SMPTE ST 2094 App 4') >= 0) {
               response.infoLog += '==ERROR== This file has HDR metadata that cannot be re-encoded '
-                + `(${file.mediaInfo.track[i + 1].HDR_Format}), `
+                + `(${mediaInfoVideoTrack(file, i).HDR_Format}), `
                 + 'Currently we cannot safely convert this HDR format and retain the Dolby Vision or HDR10+ format. '
                 + 'Aborting!\n';
               return response;

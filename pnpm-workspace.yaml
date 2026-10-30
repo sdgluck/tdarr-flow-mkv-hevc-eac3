@@ -1,0 +1,5 @@
+# esbuild's install script only checks its binary, which pnpm already fetches as
+# an optional dependency. pnpm 11 fails the install until this is decided, and
+# its pre-run dependency check turns that into a failed pre-commit hook.
+allowBuilds:
+  esbuild: false

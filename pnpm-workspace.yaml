@@ -1,5 +1,10 @@
 # esbuild's install script only checks its binary, which pnpm already fetches as
 # an optional dependency. pnpm 11 fails the install until this is decided, and
 # its pre-run dependency check turns that into a failed pre-commit hook.
+#
+# tdarr-flow-test comes from GitHub, so pnpm has to prepare it, and that needs
+# its `prepare` script (husky, a no-op outside its own repo) allowed. The key
+# names the exact commit: bump it together with the pin in package.json.
 allowBuilds:
   esbuild: false
+  tdarr-flow-test@git+https://github.com/sdgluck/tdarr-flow-test.git#ff333a30902646bcb43b6d40da23694e58496d92: true

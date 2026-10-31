@@ -1,12 +1,16 @@
 # Tests
 
-Built on [`tdarr-flow-test`](../../tdarr-test), linked from `../tdarr-test`.
+Built on [`tdarr-flow-test`](https://github.com/sdgluck/tdarr-flow-test), a dev
+dependency pinned to a commit. It ships TypeScript source and Node refuses to
+strip types under `node_modules`, so `lint:flow` and `fuzz` run its CLI through
+`tsx`. To move the pin, change the commit in `package.json` and in
+`allowBuilds` in `pnpm-workspace.yaml`.
 
 ```sh
 pnpm test            # regression suite - MUST be green
 pnpm test:findings   # findings suite   - red until each defect is fixed
 pnpm typecheck
-pnpm lint:flow       # tdarr-test lint, pretty printed
+pnpm lint:flow       # flow lint, pretty printed
 ```
 
 There is no bespoke tooling in this repo. Everything generic lives in the
@@ -36,7 +40,8 @@ tests. Add a `tests/findings/*.test.ts` when the next defect turns up.
 ## How much these prove
 
 The harness executes the **real** stock plugins from vendored Tdarr source, not
-models of them — `tdarr-test plugins` reports which commit. Only nodes that
+models of them — `pnpm exec tsx node_modules/tdarr-flow-test/src/cli.ts plugins`
+reports which commit. Only nodes that
 shell out to ffmpeg/mkvpropedit or move files are still modelled, and their
 routing logic is reproduced from the real source.
 

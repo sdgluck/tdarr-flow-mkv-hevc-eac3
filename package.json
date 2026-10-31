@@ -2,19 +2,28 @@
   "name": "tdarr-flow-mkv-hevc-eac3",
   "private": true,
   "type": "module",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sdgluck/tdarr-flow-mkv-hevc-eac3.git"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "test": "vitest run --config vitest.config.ts",
     "test:findings": "vitest run --config vitest.findings.config.ts",
     "typecheck": "tsc --noEmit",
-    "lint:flow": "tdarr-test lint flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --ignore missing-error-edge:audProped,missing-error-edge:audExec001,unwired-handle:gateMedium",
+    "lint:flow": "tsx node_modules/tdarr-flow-test/src/cli.ts lint flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --ignore missing-error-edge:audProped,missing-error-edge:audExec001,unwired-handle:gateMedium",
     "prepare": "husky",
-    "fuzz": "tdarr-test fuzz flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --video-only"
+    "fuzz": "tsx node_modules/tdarr-flow-test/src/cli.ts fuzz flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --video-only"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
-    "tdarr-flow-test": "link:../tdarr-test",
+    "tdarr-flow-test": "github:sdgluck/tdarr-flow-test#ff333a30902646bcb43b6d40da23694e58496d92",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
   }

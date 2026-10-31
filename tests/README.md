@@ -3,8 +3,7 @@
 Built on [`tdarr-flow-test`](https://github.com/sdgluck/tdarr-flow-test), a dev
 dependency pinned to a commit. It ships TypeScript source and Node refuses to
 strip types under `node_modules`, so `lint:flow` and `fuzz` run its CLI through
-`tsx`. To move the pin, change the commit in `package.json` and in
-`allowBuilds` in `pnpm-workspace.yaml`.
+`tsx`.
 
 ```sh
 pnpm test            # regression suite - MUST be green

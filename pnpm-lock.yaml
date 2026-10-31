@@ -18,8 +18,8 @@ importers:
         specifier: ^17.3.0
         version: 17.5.0
       tdarr-flow-test:
-        specifier: github:sdgluck/tdarr-flow-test#ff333a30902646bcb43b6d40da23694e58496d92
-        version: git+https://github.com/sdgluck/tdarr-flow-test.git#ff333a30902646bcb43b6d40da23694e58496d92
+        specifier: github:sdgluck/tdarr-flow-test#932687bfa48148c2a6d8d5278f3908d103f88975
+        version: https://codeload.github.com/sdgluck/tdarr-flow-test/tar.gz/932687bfa48148c2a6d8d5278f3908d103f88975
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -627,8 +627,8 @@ packages:
     resolution: {integrity: sha512-aqD2Q0144Z+/RqG52NeHEkZauTAUWJO8c6yTftGJKO3Tja5tUgIfmIl6kExvhtxSDP7fXB6DvzkfMpCd/F3G+Q==}
     engines: {node: '>=0.6.19'}
 
-  tdarr-flow-test@git+https://github.com/sdgluck/tdarr-flow-test.git#ff333a30902646bcb43b6d40da23694e58496d92:
-    resolution: {commit: ff333a30902646bcb43b6d40da23694e58496d92, repo: https://github.com/sdgluck/tdarr-flow-test.git, type: git}
+  tdarr-flow-test@https://codeload.github.com/sdgluck/tdarr-flow-test/tar.gz/932687bfa48148c2a6d8d5278f3908d103f88975:
+    resolution: {gitHosted: true, integrity: sha512-sLwaAJ8kBOPFVHdhX3x+9WZXw78wiAy9bqesq/oWWK1MQGSvgHcMnPlnFwKuX+tDX+AkMmretzdizX+dT1zDLw==, tarball: https://codeload.github.com/sdgluck/tdarr-flow-test/tar.gz/932687bfa48148c2a6d8d5278f3908d103f88975}
     version: 0.1.0
     engines: {node: '>=24.0.0'}
     hasBin: true
@@ -1176,7 +1176,7 @@ snapshots:
 
   string-argv@0.3.2: {}
 
-  tdarr-flow-test@git+https://github.com/sdgluck/tdarr-flow-test.git#ff333a30902646bcb43b6d40da23694e58496d92: {}
+  tdarr-flow-test@https://codeload.github.com/sdgluck/tdarr-flow-test/tar.gz/932687bfa48148c2a6d8d5278f3908d103f88975: {}
 
   tinybench@2.9.0: {}
 

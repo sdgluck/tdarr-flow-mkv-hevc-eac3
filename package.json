@@ -22,7 +22,7 @@
     "@types/node": "^22.10.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
-    "tdarr-flow-test": "github:sdgluck/tdarr-flow-test#ff333a30902646bcb43b6d40da23694e58496d92",
+    "tdarr-flow-test": "github:sdgluck/tdarr-flow-test#932687bfa48148c2a6d8d5278f3908d103f88975",
     "tsx": "^4.23.15",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"

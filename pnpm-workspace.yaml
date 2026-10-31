@@ -3,4 +3,3 @@
 # its pre-run dependency check turns that into a failed pre-commit hook.
 allowBuilds:
   esbuild: false
-  tdarr-flow-test@git+https://github.com/sdgluck/tdarr-flow-test.git#ff333a30902646bcb43b6d40da23694e58496d92: set this to true or false

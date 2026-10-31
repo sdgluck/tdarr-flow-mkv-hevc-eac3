@@ -1,5 +1,8 @@
 # tdarr-flow-mkv-hevc-eac3
 
+A [Tdarr](https://tdarr.io) flow, its local plugins and a regression suite. It
+brings a media library to one consistent shape for Plex:
+
 - **MKV** container
 - **HEVC** video
 - **English audio only**, directly playable codec
@@ -7,6 +10,24 @@
 - **At most one English subtitle track**, no commentary or audio description
 - Accurate track statistics tags
 - Files that already match are left alone
+
+## Use
+
+Import `flows/transcode-pipeline.json` from Tdarr's Flows tab and copy `plugins/`
+to the server, as described in [Deploying a change](#deploying-a-change). The
+encoder is chosen by node name, so name a node `Nvidia` or `Intel` to use NVENC
+or QuickSync; any other node encodes on the CPU.
+
+## Development
+
+Needs Node 24 or later and pnpm.
+
+```sh
+pnpm install
+pnpm test
+```
+
+See [`tests/README.md`](tests/README.md) for what the suite covers.
 
 ## Stages
 
@@ -335,4 +356,10 @@ pnpm lint:flow   # structural lint
 pnpm fuzz        # synthetic files through the flow
 ```
 
-Server: `tdarr-server:8266` (Tdarr 2.86.01), nodes `Nvidia` and `Intel`.
+Last run against Tdarr 2.86.01.
+
+## Licence
+
+GPL-3.0. See [`LICENSE`](LICENSE). Plugins here derive from
+[HaveAGitGat/Tdarr_Plugins](https://github.com/HaveAGitGat/Tdarr_Plugins), which
+is also GPL-3.0.

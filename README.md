@@ -231,7 +231,40 @@ original library file by path **and** size.
 
 - Changed → `Is MKV?` → `Run MKVPropEdit` re-stamps statistics tags → `Replace
   Original File`. A file that is not MKV skips `Run MKVPropEdit`.
-- Unchanged → straight to `Replace Original File`, which is itself a no-op.
+- Unchanged → straight to its own `Replace Original File`, which is itself a
+  no-op.
+
+The changed branch then runs `Notify Plex` (local `notifyPlex`), which asks Plex
+to rescan the file's folder and then to re-analyse the item, found by its exact
+path. Plex otherwise keeps the stream info it analysed before the swap. An H.264
+file re-encoded to HEVC under the same name was still recorded as H.264, so
+Plex's transcoder fed HEVC to the H.264 decoder and every frame failed:
+
+```
+[h264 @ 0x15430eb2e0c0] Invalid NAL unit size (0 > 7582).
+[h264 @ 0x15430eb2e0c0] Error splitting the input into NAL units.
+```
+
+A rescan alone does not fix that. Plex had already recorded the new file's size
+and still said H.264; only an analyse changed it to HEVC. A file Plex has not
+seen yet, such as an `.mp4` that came out as `.mkv`, is left to the rescan, which
+adds and analyses it.
+
+The unchanged branch has its own Replace node so that a pass over an already
+compliant library triggers no scans.
+
+The step is **optional**. It reads three Tdarr global variables (Options →
+Variables), so the exported flow never holds a token:
+
+| variable        | example                     |                                                    |
+| --------------- | --------------------------- | -------------------------------------------------- |
+| `plex_url`      | `http://192.168.1.10:32400` | required                                           |
+| `plex_token`    | your `X-Plex-Token`         | required                                           |
+| `plex_path_map` | `/media=/data`              | `<tdarr prefix>=<plex prefix>`, comma-separated; only where the mounts differ |
+
+With either of the first two unset it logs "skipping" and does nothing. A Plex
+that cannot be reached, or a folder no Plex library contains, is logged and the
+job still succeeds: the file is already committed by then.
 
 The final `Run MKVPropEdit` has no `err1` edge, so a failed run never commits to
 the library: the working copy stays in cache and the job reports the error.
@@ -293,11 +326,12 @@ flowchart TD
     NORM --> EXEC[Execute]
 
     EXEC --> CHG{File Changed?}
-    CHG -->|no| REPL[Replace Original File]
+    CHG -->|no| SAME[Replace Original File, no-op]
     CHG -->|yes| MKV3{Is MKV?}
     MKV3 -->|yes| PROP3[Run MKVPropEdit]
-    MKV3 -->|no| REPL
+    MKV3 -->|no| REPL[Replace Original File]
     PROP3 --> REPL
+    REPL --> PLEX[Notify Plex, optional]
 
     subgraph audio [Audio ffmpeg command block]
         START
@@ -330,6 +364,7 @@ Used by the flow:
   description / SDH tracks.
 - `normaliseAudioTracks` — reduce to one surround + one stereo/mono track and
   set audio order.
+- `notifyPlex` — optional Plex folder rescan after a changed file is committed.
 
 Not referenced by the flow, kept in the repo: `CleanAudio`, `CleanSubs`,
 `keepOneAudioStream`, `00td_action_remux_container`, `MC93_Migz3CleanAudio`,

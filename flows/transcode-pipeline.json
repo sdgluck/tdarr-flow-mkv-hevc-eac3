@@ -531,6 +531,35 @@
         "x": 1140,
         "y": -192
       }
+    },
+    {
+      "name": "Replace Original File",
+      "sourceRepo": "Community",
+      "pluginName": "replaceOriginalFile",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "replSame",
+      "position": {
+        "x": 864,
+        "y": 1120
+      }
+    },
+    {
+      "id": "plexNotify",
+      "name": "Notify Plex",
+      "sourceRepo": "Local",
+      "pluginName": "notifyPlex",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "position": {
+        "x": 624,
+        "y": 1216
+      },
+      "inputsDB": {
+        "plexUrl": "{{{args.userVariables.global.plex_url}}}",
+        "plexToken": "{{{args.userVariables.global.plex_token}}}",
+        "pathMap": "{{{args.userVariables.global.plex_path_map}}}"
+      }
     }
   ],
   "flowEdges": [
@@ -747,7 +776,7 @@
     {
       "source": "audChgChk",
       "sourceHandle": "2",
-      "target": "XLXwY90TH",
+      "target": "replSame",
       "targetHandle": null,
       "id": "aud-e27"
     },
@@ -967,6 +996,13 @@
       "sourceHandle": "1",
       "target": "audCpuEnc",
       "targetHandle": null
+    },
+    {
+      "source": "XLXwY90TH",
+      "sourceHandle": "1",
+      "target": "plexNotify",
+      "targetHandle": null,
+      "id": "plex-e1"
     }
   ],
   "isUiLocked": false

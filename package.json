@@ -14,7 +14,7 @@
     "test": "vitest run --config vitest.config.ts",
     "test:findings": "vitest run --config vitest.findings.config.ts",
     "typecheck": "tsc --noEmit",
-    "lint:flow": "tsx node_modules/tdarr-flow-test/src/cli.ts lint flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --ignore missing-error-edge:audProped,missing-error-edge:audExec001,unwired-handle:gateMedium",
+    "lint:flow": "tsx node_modules/tdarr-flow-test/src/cli.ts lint flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --ignore missing-error-edge:audProped,missing-error-edge:audExec001,unwired-handle:gateMedium,unwired-handle:plexNotify",
     "prepare": "husky",
     "fuzz": "tsx node_modules/tdarr-flow-test/src/cli.ts fuzz flows/transcode-pipeline.json --classic-plugins plugins/Local --flow-plugins plugins/FlowPlugins/LocalFlowPlugins --video-only"
   },

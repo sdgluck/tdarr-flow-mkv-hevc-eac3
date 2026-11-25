@@ -31,10 +31,22 @@ describe('flow structure', () => {
     expect(unmodelled).toEqual([]);
   });
 
-  it('terminates only at Replace Original File', () => {
-    const terminals = flow.terminals();
-    expect(terminals).toHaveLength(1);
-    expect(terminals[0]?.pluginName).toBe('replaceOriginalFile');
+  it('terminates only at Replace Original File, or at Notify Plex just after one', () => {
+    const terminals = flow.terminals().map((n) => n.pluginName).sort();
+    expect(terminals).toEqual(['notifyPlex', 'replaceOriginalFile']);
+  });
+
+  it('notifies Plex only after a changed file is committed', () => {
+    // Plex keeps the codec it analysed before Tdarr swapped the file. An HEVC
+    // file still recorded as H.264 is fed to the H.264 decoder, which fails
+    // every frame with "Invalid NAL unit size". An unchanged file has nothing
+    // to re-analyse, so a bulk pass over a compliant library must not trigger
+    // thousands of scans.
+    expect(flow.target(nodes.replace, '1')).toBe(nodes.notifyPlex);
+    expect(flow.target(nodes.fileChanged, '2')).toBe(nodes.replaceUnchanged);
+    expect(flow.target(nodes.replaceUnchanged, '1')).toBeNull();
+    const intoNotify = flow.incoming(nodes.notifyPlex).map((edge) => edge.source);
+    expect(intoNotify).toEqual([nodes.replace]);
   });
 });
 
@@ -168,6 +180,8 @@ describe('invariants the pipeline depends on', () => {
         'missing-error-edge:audProped',
         'missing-error-edge:audExec001',
         'unwired-handle:gateMedium',
+        // The flow's last step. Its one output ends the job, as Replace's does.
+        'unwired-handle:plexNotify',
       ],
     });
     expect(findings.map((f) => `${f.rule}: ${f.message}`)).toEqual([]);

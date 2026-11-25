@@ -81,4 +81,6 @@ export const nodes = {
   fileChanged: 'audChgChk',
   finalPropEdit: 'audProped',
   replace: 'XLXwY90TH',
+  replaceUnchanged: 'replSame',
+  notifyPlex: 'plexNotify',
 } as const;

@@ -386,6 +386,32 @@ Not referenced by the flow, kept in the repo: `CleanAudio`, `CleanSubs`,
 `keepOneAudioStream`, `00td_action_remux_container`, `MC93_Migz3CleanAudio`,
 `sdf5_Thierrrrry_Remove_Non_English_Audio`.
 
+## Queueing new imports
+
+By default a library only finds new files on its scheduled scan. Instead,
+[`scripts/tdarr-scan.sh`](scripts/tdarr-scan.sh) has Radarr and Sonarr queue
+each file in Tdarr the moment they import it:
+
+1. Copy it into each app's config folder, e.g. `/config/scripts/tdarr-scan.sh`,
+   and make it executable.
+2. Fill in the settings block: Tdarr's URL, the Film and TV library IDs, and how
+   each app's root folder maps to Tdarr's. Library IDs come from Tdarr's API:
+   `POST /api/v2/cruddb` with
+   `{"data":{"collection":"LibrarySettingsJSONDB","mode":"getAll"}}`.
+3. In each app, Settings → Connect → Custom Script, triggers **On File Import**
+   and **On File Upgrade**, path as above.
+4. Press **Test**. The script checks that Tdarr is reachable from inside the
+   container and exits non-zero if not; the reason lands in the app's log.
+
+A season pack imports several files in one event; they go to Tdarr as one scan.
+The scan uses `scanFindNew`, so a file Tdarr already knows by path, such as a
+re-download that replaced an existing file, is not requeued. Requeue that by
+hand.
+
+If **Test** fails with "Could not resolve host", the container's DNS cannot
+see a name only your LAN's DNS knows. Set `TDARR_RESOLVE` to
+`host:443:<proxy address>` rather than switching to plain HTTP.
+
 ## Deploying a change
 
 Flow edits take effect on import. Local plugin changes do not — nodes run

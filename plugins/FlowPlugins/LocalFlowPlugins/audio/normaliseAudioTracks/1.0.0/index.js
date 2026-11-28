@@ -51,6 +51,37 @@ var details = function () { return ({
                 + 'other language. Leave empty to ignore language entirely.',
         },
         {
+            label: 'Surround Bitrate',
+            name: 'surroundBitrate',
+            type: 'string',
+            defaultValue: '384k',
+            inputUI: {
+                type: 'text',
+            },
+            tooltip: 'Bitrate for an original-language surround track this node encodes. '
+                + 'The English tracks take theirs from the Ensure nodes.',
+        },
+        {
+            label: 'Stereo Bitrate',
+            name: 'stereoBitrate',
+            type: 'string',
+            defaultValue: '192k',
+            inputUI: {
+                type: 'text',
+            },
+            tooltip: 'Bitrate for an original-language stereo track this node encodes.',
+        },
+        {
+            label: 'Mono Bitrate',
+            name: 'monoBitrate',
+            type: 'string',
+            defaultValue: '96k',
+            inputUI: {
+                type: 'text',
+            },
+            tooltip: 'Bitrate for an original-language mono track this node encodes.',
+        },
+        {
             label: 'Bitrate Floor',
             name: 'bitrateFloor',
             type: 'string',
@@ -247,6 +278,37 @@ var applyDisposition = function (stream, wantDefault) {
 var isDefault = function (stream) {
     return Number((stream.disposition || {}).default || 0) === 1;
 };
+// The film's original language, by the same rule CleanTracks uses to decide
+// what to keep: the "original" disposition, else the single default audio
+// track, read from the library file as downloaded. The working file is no good:
+// ffmpeg's Matroska muxer flags the first track default when the input flagged
+// none, so by now "default" may only mean "first".
+var DESCRIPTION_TITLE = /descri(ption|ptive)|visually impaired/i;
+var languageOf = function (stream) {
+    return String(((stream.tags || {}).language || '')).toLowerCase();
+};
+var originalAudioLanguage = function (file) {
+    var streams = ((file || {}).ffProbeData || {}).streams || [];
+    var audio = streams.filter(function (stream) {
+        var d = stream.disposition || {};
+        var title = String((stream.tags || {}).title || '');
+        return stream.codec_type === 'audio' && d.comment !== 1 && d.visual_impaired !== 1
+            && d.descriptions !== 1 && !DESCRIPTION_TITLE.test(title);
+    });
+    var flagged = audio.filter(function (stream) { return (stream.disposition || {}).original === 1; });
+    var pick = flagged.length > 0 ? flagged
+        : audio.filter(function (stream) { return (stream.disposition || {}).default === 1; });
+    var langs = pick.map(languageOf).filter(function (lang, i, all) { return all.indexOf(lang) === i; });
+    if (langs.length !== 1 || !langs[0] || langs[0] === 'und') {
+        return null;
+    }
+    return langs[0];
+};
+var EAC3_MAX_CHANNELS = 6;
+var encodeArgs = function (codec, channels, bitrate) {
+    return ['-c:{outputIndex}', codec, '-ac:{outputIndex}', String(channels),
+        '-b:a:{outputTypeIndex}', bitrate];
+};
 var describe = function (stream) {
     var lang = (stream.tags && stream.tags.language) || 'untagged';
     return "index ".concat(stream.index, " (").concat(stream.codec_name, ", ")
@@ -276,19 +338,84 @@ var plugin = function (args) {
             variables: args.variables,
         };
     }
-    var surround = audioStreams.filter(function (stream) {
-        return Number(stream.channels || 0) >= surroundMin;
-    });
-    var stereo = audioStreams.filter(function (stream) {
-        return Number(stream.channels || 0) < surroundMin;
-    });
+    var isSurround = function (stream) { return Number(stream.channels || 0) >= surroundMin; };
+    var pickTiers = function (candidates) {
+        var tiers = [];
+        var surround = candidates.filter(isSurround);
+        var stereo = candidates.filter(function (stream) { return !isSurround(stream); });
+        if (surround.length > 0) {
+            tiers.push(pickBest(surround, isBetter));
+        }
+        if (stereo.length > 0) {
+            tiers.push(pickBest(stereo, isBetter));
+        }
+        return tiers;
+    };
+    // A foreign film keeps its original-language audio in full - surround plus a
+    // stereo mate - ahead of the English tracks, and flagged default. The Ensure
+    // nodes only ever build English tracks, so this node builds the original's.
+    var originalLang = originalAudioLanguage(args.originalLibraryFile);
+    var originalAudio = originalLang && originalLang !== preferredLanguage
+        ? audioStreams.filter(function (stream) { return languageOf(stream) === originalLang; })
+        : [];
+    var mainAudio = originalAudio.length > 0
+        ? audioStreams.filter(function (stream) { return originalAudio.indexOf(stream) === -1; })
+        : audioStreams;
     var keep = [];
-    if (surround.length > 0) {
-        keep.push(pickBest(surround, isBetter));
+    if (originalAudio.length > 0) {
+        args.jobLog("Original audio language is ".concat(originalLang, "; keeping it first \n"));
+        var encode = function (stream, channels, bitrate) {
+            // eslint-disable-next-line no-param-reassign
+            stream.outputArgs = encodeArgs(targetCodec, channels, bitrate);
+            // eslint-disable-next-line no-param-reassign
+            stream.codec_name = targetCodec;
+            // eslint-disable-next-line no-param-reassign
+            stream.channels = channels;
+            args.variables.ffmpegCommand.shouldProcess = true;
+            args.jobLog("Encoding ".concat(originalLang, " index ").concat(stream.index, " to ")
+                .concat(targetCodec, " ").concat(channels, "ch @").concat(bitrate, " \n"));
+        };
+        var originalSurround = originalAudio.filter(isSurround);
+        if (originalSurround.length > 0) {
+            var surroundKeep = pickBest(originalSurround, isBetter);
+            // Cloned before any args land on it, exactly as Ensure clones.
+            var mateSource = JSON.parse(JSON.stringify(surroundKeep));
+            var surroundChannels = Number(surroundKeep.channels || 0);
+            if (surroundKeep.codec_name !== targetCodec || surroundChannels > EAC3_MAX_CHANNELS) {
+                encode(surroundKeep, Math.min(surroundChannels, EAC3_MAX_CHANNELS), String(args.inputs.surroundBitrate));
+            }
+            keep.push(surroundKeep);
+            var readyMates = originalAudio.filter(function (stream) {
+                return Number(stream.channels || 0) === 2 && stream.codec_name === targetCodec;
+            });
+            if (readyMates.length > 0) {
+                keep.push(pickBest(readyMates, isBetter));
+            }
+            else {
+                var mate = mateSource;
+                mate.index = streams.length;
+                mate.removed = false;
+                mate.outputArgs = [];
+                mate.disposition = Object.assign({}, mate.disposition, { default: 0 });
+                // Beside its source, not appended: Reorder Streams has already
+                // grouped by type, so the end of the list is after the subtitles.
+                streams.splice(streams.indexOf(surroundKeep) + 1, 0, mate);
+                audioStreams.push(mate);
+                encode(mate, 2, String(args.inputs.stereoBitrate));
+                keep.push(mate);
+            }
+        }
+        else {
+            var stereoKeep = pickBest(originalAudio, isBetter);
+            var stereoChannels = Math.min(Number(stereoKeep.channels || 0), 2);
+            if (stereoKeep.codec_name !== targetCodec || Number(stereoKeep.channels || 0) !== stereoChannels) {
+                encode(stereoKeep, stereoChannels, String(stereoChannels === 1
+                    ? args.inputs.monoBitrate : args.inputs.stereoBitrate));
+            }
+            keep.push(stereoKeep);
+        }
     }
-    if (stereo.length > 0) {
-        keep.push(pickBest(stereo, isBetter));
-    }
+    keep = keep.concat(pickTiers(mainAudio));
     // Cannot happen given the guard above, but a silent file is bad enough to
     // be worth the belt and braces: an empty stream map also fails the job.
     if (keep.length === 0) {
@@ -342,30 +469,32 @@ var plugin = function (args) {
         keep.forEach(function (stream, index) {
             applyDisposition(stream, index === 0);
         });
+        var cleared = keep.slice(1).map(function (stream) { return "index ".concat(stream.index); });
         args.jobLog("Default audio flag set on index ".concat(keep[0].index, " and cleared on ")
-            .concat(keep.length > 1 ? "index ".concat(keep[1].index) : 'nothing else', " \n"));
+            .concat(cleared.length > 0 ? cleared.join(', ') : 'nothing else', " \n"));
         // eslint-disable-next-line no-param-reassign
         args.variables.ffmpegCommand.shouldProcess = true;
     }
-    // Put the surround track first. Execute maps streams in array order, and
+    // Put the kept tracks in the order chosen above: original language first,
+    // then English, surround ahead of stereo within each. Execute maps streams in array order, and
     // players generally default to the first audio track, so this decides what
     // you actually hear. "Reorder Streams" cannot do it: its channel map only
     // knows 8/6/2/1, so a 4-channel track sorts as an empty string and lands
     // wherever it started. It runs before this node and groups by stream type
     // only, and its sort is stable, so the order set here is the one Execute
     // sees.
-    if (keep.length === 2) {
-        var surroundKeep = keep[0];
-        var stereoKeep = keep[1];
-        var surroundAt = streams.indexOf(surroundKeep);
-        var stereoAt = streams.indexOf(stereoKeep);
-        if (surroundAt > stereoAt) {
-            streams[stereoAt] = surroundKeep;
-            streams[surroundAt] = stereoKeep;
-            args.jobLog('Moved the surround track ahead of the stereo track \n');
-            // eslint-disable-next-line no-param-reassign
-            args.variables.ffmpegCommand.shouldProcess = true;
-        }
+    // The kept tracks are dealt back into the slots they already occupy, so
+    // video and subtitles never move.
+    var slots = keep.map(function (stream) { return streams.indexOf(stream); })
+        .sort(function (a, b) { return a - b; });
+    var moved = keep.some(function (stream, i) { return streams[slots[i]] !== stream; });
+    if (moved) {
+        keep.forEach(function (stream, i) {
+            streams[slots[i]] = stream;
+        });
+        args.jobLog('Reordered audio: '.concat(keep.map(describe).join(', '), " \n"));
+        // eslint-disable-next-line no-param-reassign
+        args.variables.ffmpegCommand.shouldProcess = true;
     }
     // E-AC3 carries 256 samples of encoder delay. The Matroska muxer records
     // that as CodecDelay and a reader reports the first packet at -0.005s,

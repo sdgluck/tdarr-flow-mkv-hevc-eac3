@@ -19,16 +19,42 @@ const isDescriptionAudio = (stream, file) => {
     .some(title => DESCRIPTION_TITLE.test(title || ''));
 };
 
+// The film's original language, so a foreign film keeps its own audio beside
+// the English dub. Observed for real: Movie B shipped
+// fre (default) + eng, and came out English-only.
+//
+// Only what the release itself declares counts: the "original" disposition,
+// else the one audio track flagged default. Track order is no signal - Show D
+// S01E01 was spa/por/eng with English the real original.
+//
+// Read from the library file as downloaded, never the working file. ffmpeg's
+// Matroska muxer stamps the first track of each type default when the input
+// flagged none (-default_mode infer), so after the HEVC encode "default" would
+// just mean "first".
+const originalAudioLanguage = (file) => {
+  const audio = (file?.ffProbeData?.streams ?? [])
+    .filter(s => s.codec_type === 'audio')
+    .filter(s => s.disposition?.comment !== 1 && !isDescriptionAudio(s, file));
+  const flagged = audio.filter(s => s.disposition?.original === 1);
+  const defaults = audio.filter(s => s.disposition?.default === 1);
+  const pick = flagged.length > 0 ? flagged : defaults;
+  // Two tracks both claiming to be default (or original) is no basis to choose.
+  const langs = [...new Set(pick.map(s => (s.tags?.language || '').toLowerCase()))];
+  if (langs.length !== 1 || !langs[0] || langs[0] === 'und') return null;
+  return langs[0];
+};
+
 const details = () => ({
   id: 'Tdarr_Plugin_bsh1_CleanTracks',
   Stage: 'Pre-processing',
   Name: 'Remove Non-English Audio and Subtitles',
   Type: 'Video',
   Operation: 'Transcode',
-  Description: 'Removes non-English audio and subtitle streams, commentary and audio description tracks, '
+  Description: 'Removes audio in languages other than English and the film\'s original language (the '
+    + 'release\'s original/default track), non-English subtitles, commentary and audio description tracks, '
     + 'in a single pass, along with any subtitle ffmpeg cannot decode. Replaces the separate '
     + 'CleanAudio/CleanSubs plugins, which each did a full read-and-rewrite of the file.',
-  Version: '1.2.0',
+  Version: '1.3.0',
   Tags: 'pre-processing,ffmpeg,audio,subtitles',
   Inputs: [
     {
@@ -80,6 +106,11 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   const audioToRemove = [];
   const subsToRemove = [];
 
+  const originalLang = originalAudioLanguage(otherArguments?.originalLibraryFile ?? file);
+  if (originalLang && originalLang !== keepLang) {
+    response.infoLog += `☑ Original audio language is ${originalLang}; keeping it beside ${keepLang}.\n`;
+  }
+
   audioStreams.forEach(stream => {
     const lang = (stream.tags?.language || '').toLowerCase();
     const title = (stream.tags?.title || '').toLowerCase();
@@ -87,7 +118,7 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
 
     // Streams with no language tag are kept: an untagged track is far more
     // often the main one than a foreign one.
-    if (lang && lang !== keepLang) {
+    if (lang && lang !== keepLang && lang !== originalLang) {
       audioToRemove.push(stream.index);
       response.infoLog += `☒ Removing audio stream ${stream.index} (lang: ${lang}).\n`;
     } else if (removeCommentary && isCommentary) {

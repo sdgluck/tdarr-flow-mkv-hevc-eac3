@@ -5,8 +5,9 @@ brings a media library to one consistent shape for Plex:
 
 - **MKV** container
 - **HEVC** video
-- **English audio only**, directly playable codec
-- At most one surround track and one stereo/mono track, surround first
+- **English audio**, plus the original language for foreign films, directly playable codec
+- Per language, at most one surround track and one stereo/mono track, surround first;
+  the original language first and default
 - **At most one English subtitle track**, no commentary or audio description
 - Accurate track statistics tags
 - Files that already match are left alone
@@ -100,8 +101,8 @@ raising the floor alone would still have routed the runt to acceptance.
 
 ### 4. Language cleanup
 
-`Remove Non English Tracks` (local `CleanTracks`) removes non-English audio and
-subtitles, commentary and audio description tracks, and optionally SDH
+`Remove Non English Tracks` (local `CleanTracks`) removes audio that is neither
+English nor the film's **original language**, non-English subtitles, commentary and audio description tracks, and optionally SDH
 subtitles — all in a single pass over the file. Font attachments are carried across, so an ASS subtitle
 still renders as authored; they are mapped only into MKV, which is the only
 container in play that can hold them.
@@ -115,6 +116,14 @@ container in play that can hold them.
 - SDH is detected from the `hearing_impaired` disposition flag or `sdh` in the
   title. The two tests are independent, gated by `remove_commentary` and
   `remove_sdh` respectively.
+- The original language is what the release declares: the audio track with the
+  `original` disposition, else the single track flagged `default`, read from the
+  library file as downloaded. The working file will not do: ffmpeg's Matroska
+  muxer flags the first track default when the input flagged none, so after the
+  HEVC encode "default" can mean merely "first". Track order is never a signal,
+  and a release that flags nothing (or two defaults) is treated as English-only.
+  Movie B (fre default + eng) lost its French audio to the
+  old English-only rule.
 - Streams with no language tag are kept.
 - The file is never left with no audio. If every audio stream would go — a
   release with no English track at all — **all** of them are kept, not one.
@@ -157,6 +166,7 @@ An ffmpeg-command block that plans one command and executes it once. Result:
 | stereo only                              | single E-AC3 2.0 @192k                                           |
 | mono only                                | single E-AC3 1.0 @96k                                            |
 | no English track                         | not converted, reduced to one surround and one stereo/mono track |
+| foreign original (see stage 4)           | original E-AC3 surround + 2.0 first (default), then English pair |
 
 The layout is decided by channel count alone, not by existing codec. Bitrates
 apply only to tracks that are encoded, and are ceilings, not targets: a track is
@@ -209,6 +219,12 @@ Nodes, in order:
     nothing downstream of it: `Reorder Streams` sets `shouldProcess` itself when
     it moves a stream, and while it ran *after* Normalise a reorder-only rewrite
     went out unpinned.
+  For a foreign original it also builds the original language's own pair, since
+  `Ensure` only builds English: a surround that is not E-AC3 (or is above 5.1) is
+  encoded at `Surround Bitrate`, and a missing E-AC3 stereo mate is generated
+  from it at `Stereo Bitrate`. A stereo/mono-only original is converted in place.
+  A release flagging no original keeps the English-only behaviour, so the
+  untouched-foreign-track row above still applies to it.
 - `Execute` builds and runs the command. Streams with no output args get
   `-c copy`, so video and subtitles are remuxed, never re-encoded.
 
